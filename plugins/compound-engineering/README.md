@@ -90,7 +90,7 @@ Core workflow commands use `ce:` prefix to unambiguously identify them as compou
 |---------|-------------|
 | `/lfg` | Full autonomous engineering workflow |
 | `/slfg` | Full autonomous workflow with swarm mode for parallel execution |
-| `/deepen-plan` | Enhance plans with parallel research agents for each section |
+| `/deepen-plan` | Stress-test plans and deepen weak sections with targeted research |
 | `/changelog` | Create engaging changelogs for recent merges |
 | `/create-agent-skill` | Create or edit Claude Code skills |
 | `/generate_command` | Generate new slash commands |

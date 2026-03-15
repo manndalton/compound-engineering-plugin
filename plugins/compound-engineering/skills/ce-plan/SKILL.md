@@ -322,6 +322,7 @@ type: [feat|fix|refactor]
 status: active
 date: YYYY-MM-DD
 origin: docs/brainstorms/YYYY-MM-DD-<topic>-requirements.md  # include when planning from a requirements doc
+deepened: YYYY-MM-DD  # optional, set later by deepen-plan when the plan is substantively strengthened
 ---
 
 # [Plan Title]
@@ -512,7 +513,7 @@ After writing the plan file, present the options using the platform's blocking q
 
 **Options:**
 1. **Open plan in editor** - Open the plan file for review
-2. **Run `deepen-plan` skill** - Enhance sections with parallel research agents
+2. **Run `deepen-plan` skill** - Stress-test weak sections with targeted research when the plan needs more confidence
 3. **Review and refine** - Improve the plan through structured document review
 4. **Share to Proof** - Upload the plan for collaborative review and sharing
 5. **Start `ce:work` skill** - Begin implementing this plan in the current environment
@@ -538,7 +539,7 @@ Based on selection:
 - **Create Issue** → Follow the Issue Creation section below
 - **Other** → Accept free text for revisions and loop back to options
 
-If running with ultrathink enabled, or the platform's reasoning/effort level is set to max or extra-high, automatically run the `deepen-plan` skill after plan creation for maximum grounding.
+If running with ultrathink enabled, or the platform's reasoning/effort level is set to max or extra-high, automatically run the `deepen-plan` skill only when the plan is `Standard` or `Deep`, high-risk, or still shows meaningful confidence gaps in decisions, sequencing, system-wide impact, risks, or verification.
 
 ## Issue Creation
 
