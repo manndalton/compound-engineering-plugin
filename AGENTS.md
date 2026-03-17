@@ -1,11 +1,11 @@
 # Agent Instructions
 
-This repository contains a Bun/TypeScript CLI that converts Claude Code plugins into other agent platform formats.
+This repository primarily houses the `compound-engineering` coding-agent plugin and the Claude Code marketplace/catalog metadata used to distribute it.
 
-It also acts as:
-- a home for the distributed plugins under `plugins/`
-- the Claude marketplace catalog under `.claude-plugin/`
-- shared release and metadata infrastructure for those components
+It also contains:
+- the Bun/TypeScript CLI that converts Claude Code plugins into other agent platform formats
+- additional plugins under `plugins/`, such as `coding-tutor`
+- shared release and metadata infrastructure for the CLI, marketplace, and plugins
 
 `AGENTS.md` is the canonical repo instruction file. Root `CLAUDE.md` exists only as a compatibility shim for tools and conversions that still look for it.
 
