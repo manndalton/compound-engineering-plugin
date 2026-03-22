@@ -17,17 +17,18 @@ When adding support for a new AI platform (e.g., Devin, Cursor, Copilot), the co
 
 ## Solution
 
-The compound-engineering-plugin uses a proven **6-phase target provider pattern** that has been successfully applied to 8 targets:
+The compound-engineering-plugin uses a proven **6-phase target provider pattern** that has been successfully applied to 10 targets:
 
 1. **OpenCode** (primary target, reference implementation)
 2. **Codex** (second target, established pattern)
 3. **Droid/Factory** (workflow/agent conversion)
 4. **Pi** (MCPorter ecosystem)
 5. **Gemini CLI** (content transformation patterns)
-6. **Cursor** (command flattening, rule formats)
-7. **Copilot** (GitHub native, MCP prefixing)
-8. **Kiro** (limited MCP support)
-9. **Devin** (playbook conversion, knowledge entries)
+6. **Copilot** (GitHub native, MCP prefixing)
+7. **Kiro** (limited MCP support)
+8. **Windsurf** (rules-based format)
+9. **OpenClaw** (open agent format)
+10. **Qwen** (Qwen agent format)
 
 Each implementation follows this architecture precisely, ensuring consistency and maintainability.
 
@@ -69,8 +70,8 @@ export type {TargetName}Agent = {
 
 **Reference Implementations:**
 - OpenCode: `src/types/opencode.ts` (command + agent split)
-- Devin: `src/types/devin.ts` (playbooks + knowledge entries)
 - Copilot: `src/types/copilot.ts` (agents + skills + MCP)
+- Windsurf: `src/types/windsurf.ts` (rules-based format)
 
 ---
 
@@ -208,15 +209,15 @@ function flattenCommandName(name: string): string {
 5. **MCP servers need target-specific handling:**
    - **OpenCode:** Merge into `opencode.json` (preserve user keys)
    - **Copilot:** Prefix env vars with `COPILOT_MCP_`, emit JSON
-   - **Devin:** Write setup instructions file (config is via web UI)
-   - **Cursor:** Pass through as-is
+   - **Windsurf:** Write MCP config in target-specific format
+   - **Kiro:** Limited MCP support, check compatibility
 
 6. **Warn on unsupported features** — Hooks, Gemini extensions, Kiro-incompatible MCP types. Emit to stderr and continue conversion.
 
 **Reference Implementations:**
 - OpenCode: `src/converters/claude-to-opencode.ts` (most comprehensive)
-- Devin: `src/converters/claude-to-devin.ts` (content transformation + cross-references)
 - Copilot: `src/converters/claude-to-copilot.ts` (MCP prefixing pattern)
+- Windsurf: `src/converters/claude-to-windsurf.ts` (rules-based conversion)
 
 ---
 
@@ -328,8 +329,7 @@ export async function backupFile(filePath: string): Promise<string | null> {
 
 5. **File extensions matter** — Match target conventions exactly:
    - Copilot: `.agent.md` (note the dot)
-   - Cursor: `.mdc` for rules
-   - Devin: `.devin.md` for playbooks
+   - Windsurf: `.md` for rules
    - OpenCode: `.md` for commands
 
 6. **Permissions for sensitive files** — MCP config with API keys should use `0o600`:
@@ -340,7 +340,7 @@ export async function backupFile(filePath: string): Promise<string | null> {
 **Reference Implementations:**
 - Droid: `src/targets/droid.ts` (simpler pattern, good for learning)
 - Copilot: `src/targets/copilot.ts` (double-nesting pattern)
-- Devin: `src/targets/devin.ts` (setup instructions file)
+- Windsurf: `src/targets/windsurf.ts` (rules-based output)
 
 ---
 
@@ -377,7 +377,7 @@ if (targetName === "{target}") {
 }
 
 // Update --to flag description
-const toDescription = "Target format (opencode | codex | droid | cursor | copilot | kiro | {target})"
+const toDescription = "Target format (opencode | codex | droid | copilot | kiro | windsurf | openclaw | qwen | {target})"
 ```
 
 ---
@@ -667,7 +667,7 @@ Use this checklist when adding a new target provider:
 
 1. **Droid** (`src/targets/droid.ts`, `src/converters/claude-to-droid.ts`) — Simplest pattern, good learning baseline
 2. **Copilot** (`src/targets/copilot.ts`, `src/converters/claude-to-copilot.ts`) — MCP prefixing, double-nesting guard
-3. **Devin** (`src/converters/claude-to-devin.ts`) — Content transformation, cross-references, intermediate types
+3. **Windsurf** (`src/targets/windsurf.ts`, `src/converters/claude-to-windsurf.ts`) — Rules-based conversion
 4. **OpenCode** (`src/converters/claude-to-opencode.ts`) — Most comprehensive, handles command structure and config merging
 
 ### Key Utilities
@@ -678,7 +678,6 @@ Use this checklist when adding a new target provider:
 
 ### Existing Tests
 
-- `tests/cursor-converter.test.ts` — Comprehensive converter tests
 - `tests/copilot-writer.test.ts` — Writer tests with temp directories
 - `tests/sync-copilot.test.ts` — Sync pattern with symlinks and config merge
 
