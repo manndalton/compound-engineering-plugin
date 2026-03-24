@@ -43,7 +43,7 @@ When invoked from an automated workflow (LFG, SLFG, or any `disable-model-invoca
 
 Specific phase behavior:
 
-- **Phase 0.1:** If a relevant requirements document already exists, note it and return control immediately. The next pipeline step (`ce:plan`) will discover and use it. Do not ask whether to resume or start fresh.
+- **Phase 0.1:** If a relevant requirements document already exists, read it and check for `Resolve Before Planning` items. If the document is plan-ready (no blocking questions), note it and return control immediately. If it still has `Resolve Before Planning` items, resume the brainstorm to resolve them (proceed to Phase 1.3) rather than returning control -- otherwise the pipeline dead-ends because `ce:plan` will block and re-invoking `ce:brainstorm` will hit this same check. Do not ask whether to resume or start fresh.
 - **Phase 0.2 short-circuit is a genuine skip.** If requirements are already clear (specific acceptance criteria, exact expected behavior, well-defined scope), skip brainstorm entirely. Note "requirements clear, skipping brainstorm" and return control to the calling workflow. Do not proceed to Phase 1.3 or Phase 3.
 - **Phases 1.3 and 2:** Content questions to clarify vague or ambiguous requirements are still permitted. The user is present and getting requirements right is more valuable than speed.
 - **Phase 4 handoff is skipped.** Do not present handoff options or invoke `/ce:plan`. Write the requirements document (if warranted) and return control to the calling workflow.
@@ -64,7 +64,7 @@ Do not proceed until you have a feature description from the user.
 
 If the user references an existing brainstorm topic or document, or there is an obvious recent matching `*-requirements.md` file in `docs/brainstorms/`:
 - Read the document
-- **In pipeline mode:** note the existing document and return control immediately (see Pipeline Mode above). Do not ask the user whether to resume.
+- **In pipeline mode:** check the document for `Resolve Before Planning` items. If none exist, note the existing document and return control immediately (see Pipeline Mode above). If blocking questions remain, resume the brainstorm to resolve them (proceed to Phase 1.3) rather than returning control. Do not ask the user whether to resume or start fresh.
 - **Otherwise:** Confirm with the user before resuming: "Found an existing requirements doc for [topic]. Should I continue from this, or start fresh?"
 - If resuming, summarize the current state briefly, continue from its existing decisions and outstanding questions, and update the existing document instead of creating a duplicate
 

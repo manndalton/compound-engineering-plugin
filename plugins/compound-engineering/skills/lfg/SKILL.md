@@ -35,6 +35,6 @@ Execute every step below in order. The early phases (brainstorm, plan) exist to 
 
 9. **Conditionally** run `/compound-engineering:feature-video` -- record a walkthrough and add to the PR. Skip if the project has no browser-based UI (e.g., CLI tools, plugins, libraries, APIs).
 
-10. Output `<promise>DONE</promise>` when video is in PR
+10. Output `<promise>DONE</promise>` when all preceding steps are complete
 
 Start with step 1 now.
