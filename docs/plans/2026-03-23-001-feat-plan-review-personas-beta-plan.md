@@ -1,7 +1,7 @@
 ---
 title: "feat: Replace document-review with persona-based review pipeline"
 type: feat
-status: active
+status: completed
 date: 2026-03-23
 deepened: 2026-03-23
 origin: docs/brainstorms/2026-03-23-plan-review-personas-requirements.md
@@ -205,7 +205,7 @@ Orchestrator routing (document review simplification):
 
 ## Implementation Units
 
-- [ ] **Unit 1: Create always-on persona agents**
+- [x] **Unit 1: Create always-on persona agents**
 
 **Goal:** Create the coherence and feasibility reviewer agents that run on every document review.
 
@@ -258,7 +258,7 @@ Orchestrator routing (document review simplification):
 
 ---
 
-- [ ] **Unit 2: Create conditional persona agents**
+- [x] **Unit 2: Create conditional persona agents**
 
 **Goal:** Create the four conditional persona agents that activate based on document content.
 
@@ -334,7 +334,7 @@ All four use the same structure established in Unit 1 (frontmatter, examples, ro
 
 ---
 
-- [ ] **Unit 3: Rewrite document-review skill with persona pipeline**
+- [x] **Unit 3: Rewrite document-review skill with persona pipeline**
 
 **Goal:** Replace the current single-voice document-review SKILL.md with the persona pipeline orchestrator.
 
@@ -446,7 +446,7 @@ Synthesis pipeline (order matters):
 
 ---
 
-- [ ] **Unit 4: Update README and validate**
+- [x] **Unit 4: Update README and validate**
 
 **Goal:** Update plugin documentation to reflect the new agents and revised skill.
 
