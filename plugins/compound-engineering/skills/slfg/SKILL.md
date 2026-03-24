@@ -17,11 +17,17 @@ Swarm-enabled LFG. Run these steps in order, parallelizing where indicated. Skil
 ## Sequential Phase
 
 3. `/ce:plan $ARGUMENTS`
+
+   GATE: Verify that `ce:plan` produced a plan file in `docs/plans/`. If no plan file was created, run `/ce:plan $ARGUMENTS` again. Do NOT proceed until a written plan exists.
+
 4. **Conditionally** run `/compound-engineering:deepen-plan`
    - Run only if the plan is `Standard` or `Deep`, touches a high-risk area (auth, security, payments, migrations, external APIs, significant rollout concerns), or still has obvious confidence gaps in decisions, sequencing, system-wide impact, risks, or verification
    - If deepen-plan ran, confirm the plan was deepened or judged sufficiently grounded before moving on
    - If skipped, note why and continue
+
 5. `/ce:work` -- **Use swarm mode**: Make a Task list and launch an army of agent swarm subagents to build the plan
+
+   GATE: Verify that implementation work was performed -- files were created or modified beyond the plan. Do NOT proceed if no code changes were made.
 
 ## Parallel Phase
 

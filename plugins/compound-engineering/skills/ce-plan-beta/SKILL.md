@@ -590,7 +590,7 @@ Confirm:
 Plan written to docs/plans/[filename]
 ```
 
-**Pipeline mode:** If invoked from an automated workflow such as LFG, SLFG, or any `disable-model-invocation` context, skip interactive questions. Make the needed choices automatically and proceed to writing the plan.
+**Pipeline mode:** If invoked from an automated workflow such as LFG, SLFG, or any `disable-model-invocation` context, skip workflow prompts (handoff menus, post-generation options). Content questions that clarify what to build -- including source-doc disambiguation when genuine ambiguity exists -- are still permitted. Make routing and detail-level decisions automatically and proceed to writing the plan.
 
 #### 5.3 Post-Generation Options
 

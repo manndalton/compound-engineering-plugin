@@ -71,7 +71,7 @@ Three-part fix across four files.
 
 Added a `## Pipeline Mode` section that defines behavior when invoked from LFG/SLFG/disable-model-invocation context:
 
-- **Phase 0.1:** If a relevant requirements doc already exists in `docs/brainstorms/`, return control immediately. `ce:plan` already discovers these docs in its Phase 0 and will use them.
+- **Phase 0.1:** If a relevant requirements doc already exists in `docs/brainstorms/`, check staleness first: skip the doc if a completed plan in `docs/plans/` already references it (via `origin:` + `status: completed`), or if its scope meaningfully diverges from the current `$ARGUMENTS`. If the doc is still relevant, check for `Resolve Before Planning` items -- if blocking questions remain, resume the brainstorm to resolve them rather than returning control (otherwise the pipeline dead-ends). If the doc is plan-ready, return control immediately.
 - **Empty feature description:** Ask the user. This is the one interaction that cannot be skipped -- brainstorm owns "what do you want to build?"
 - **Phase 0.2:** Genuine skip when requirements are clear. Do NOT proceed to Phase 1.3 (interactive dialogue) or Phase 3.
 - **Workflow prompts** (handoff menus, "what do you want to do next?", "resume or start fresh?", post-generation options): Skip. The pipeline controls routing.
