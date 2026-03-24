@@ -145,9 +145,14 @@ Decision boundaries in autopilot mode:
 
    When creating a branch automatically:
    ```bash
-   git pull origin [default_branch]
-   git checkout -b feature-branch-name
+   if [ -n "$(git status --porcelain)" ]; then
+     git checkout -b feature-branch-name
+   else
+     git pull origin [default_branch]
+     git checkout -b feature-branch-name
+   fi
    ```
+   If the worktree is dirty, branch first so local artifacts such as a newly written plan file carry forward safely. Only pull before branching when the worktree is clean.
    Use a meaningful name based on the work (e.g., `feat/user-authentication`, `fix/email-validation`).
 
 3. **Create Todo List**

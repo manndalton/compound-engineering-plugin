@@ -66,11 +66,17 @@ describe("autopilot skill contract", () => {
     expect(work).toContain("`Engineer > Designer > Product Manager`")
     expect(work).toContain("`Local Leverage`")
     expect(work).toContain("execution discoveries")
+    expect(work).toContain('if [ -n "$(git status --porcelain)" ]; then')
+    expect(work).toContain("Only pull before branching when the worktree is clean")
+
+    expect(workBeta).toContain('if [ -n "$(git status --porcelain)" ]; then')
+    expect(workBeta).toContain("Only pull before branching when the worktree is clean")
   })
 
   test("utility skills and review utility use the shared autopilot contract", async () => {
     const review = await readRepoFile("plugins/compound-engineering/skills/ce-review/SKILL.md")
     const reviewBeta = await readRepoFile("plugins/compound-engineering/skills/ce-review-beta/SKILL.md")
+    const setup = await readRepoFile("plugins/compound-engineering/skills/setup/SKILL.md")
     const documentReview = await readRepoFile("plugins/compound-engineering/skills/document-review/SKILL.md")
     const schema = await readRepoFile(
       "plugins/compound-engineering/skills/document-review/references/findings-schema.json",
@@ -86,6 +92,10 @@ describe("autopilot skill contract", () => {
 
     expect(reviewBeta).toContain("[ce-autopilot manifest=.context/compound-engineering/autopilot/<run-id>/session.json] ::")
     expect(reviewBeta).toContain("Default to `mode:autofix` when no explicit mode token remains")
+
+    expect(setup).toContain("preserve the current `implementation_mode` unless the user explicitly changes it during setup")
+    expect(setup).toContain("implementation_mode: {existing value or chosen value, default standard}")
+    expect(setup).toContain("How should lfg handle implementation by default?")
 
     expect(documentReview).toContain("review utility, not a primary decision-maker")
     expect(documentReview).toContain("`mechanical-fix`")
