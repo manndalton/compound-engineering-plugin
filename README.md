@@ -129,14 +129,16 @@ All provider targets are experimental and may change as the formats evolve.
 
 ## Installing from a Branch
 
-When working with worktrees or testing someone else's branch, `./plugins/compound-engineering` points to whatever branch your main checkout is on -- not the branch you want. Use `--branch` to install from a specific branch without switching checkouts.
+When working with worktrees or testing someone else's branch, `./plugins/compound-engineering` points to whatever branch your main checkout is on -- not the branch you want. Use `--branch` to install from a pushed branch without switching checkouts.
+
+> **Unpushed local branches**: If the branch exists only in a local worktree and hasn't been pushed, point `--plugin-dir` directly at the worktree path instead (e.g. `claude --plugin-dir /path/to/worktree/plugins/compound-engineering`).
 
 **Claude Code** -- use `plugin-path` to clone the branch to a stable cache directory:
 
 ```bash
 bunx @every-env/compound-plugin plugin-path compound-engineering --branch feat/new-agents
 # Output:
-#   claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat-new-agents/plugins/compound-engineering
+#   claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat~new-agents/plugins/compound-engineering
 ```
 
 The cache path is deterministic (same branch always maps to the same directory). Re-running updates the checkout to the latest commit on that branch.
@@ -195,7 +197,7 @@ When developing and testing local changes to the plugin:
 
 ```bash
 # add to ~/.zshrc or ~/.bashrc
-alias cce='claude --plugin-dir ~/code/compound-engineering-plugin/plugins/compound-engineering'
+alias claude-dev-ce='claude --plugin-dir ~/code/compound-engineering-plugin/plugins/compound-engineering'
 ```
 
 One-liner to append it:

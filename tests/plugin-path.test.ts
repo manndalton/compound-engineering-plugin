@@ -84,7 +84,7 @@ describe("plugin-path", () => {
       throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
     }
 
-    const cacheDir = path.join(tempHome, ".cache", "compound-engineering", "branches", "compound-engineering-feat-test-branch")
+    const cacheDir = path.join(tempHome, ".cache", "compound-engineering", "branches", "compound-engineering-feat~test-branch")
     const pluginDir = path.join(cacheDir, "plugins", "compound-engineering")
 
     expect(stderr).toContain("claude --plugin-dir")
@@ -126,7 +126,7 @@ describe("plugin-path", () => {
       throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
     }
 
-    expect(stdout).toContain("compound-engineering-feat-deep-nested-branch")
+    expect(stdout).toContain("compound-engineering-feat~deep~nested~branch")
     expect(stderr).toContain("claude --plugin-dir")
   })
 
@@ -143,7 +143,7 @@ describe("plugin-path", () => {
     await runGit(["checkout", "main"], repoRoot, gitEnv)
 
     const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "plugin-path-update-"))
-    const cacheDir = path.join(tempHome, ".cache", "compound-engineering", "branches", "compound-engineering-feat-update-test")
+    const cacheDir = path.join(tempHome, ".cache", "compound-engineering", "branches", "compound-engineering-feat~update-test")
 
     const runPluginPath = async () => {
       const proc = Bun.spawn([
@@ -217,6 +217,51 @@ describe("plugin-path", () => {
 
     const exitCode = await proc.exited
     expect(exitCode).not.toBe(0)
+  })
+
+  test("produces distinct cache paths for branches that differ only by slash placement", async () => {
+    const repoRoot = await createTestRepo()
+    await runGit(["checkout", "-b", "feat/foo-bar"], repoRoot, gitEnv)
+    await runGit(["checkout", "main"], repoRoot, gitEnv)
+    await runGit(["checkout", "-b", "feat-foo/bar"], repoRoot, gitEnv)
+    await runGit(["checkout", "main"], repoRoot, gitEnv)
+
+    const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "plugin-path-collision-"))
+
+    const runForBranch = async (branch: string) => {
+      const proc = Bun.spawn([
+        "bun",
+        "run",
+        path.join(projectRoot, "src", "index.ts"),
+        "plugin-path",
+        "compound-engineering",
+        "--branch",
+        branch,
+      ], {
+        cwd: projectRoot,
+        stdout: "pipe",
+        stderr: "pipe",
+        env: {
+          ...gitEnv,
+          HOME: tempHome,
+          COMPOUND_PLUGIN_GITHUB_SOURCE: repoRoot,
+        },
+      })
+      const exitCode = await proc.exited
+      const stdout = await new Response(proc.stdout).text()
+      const stderr = await new Response(proc.stderr).text()
+      if (exitCode !== 0) {
+        throw new Error(`CLI failed for branch '${branch}' (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+      }
+      return stdout.trim()
+    }
+
+    const path1 = await runForBranch("feat/foo-bar")
+    const path2 = await runForBranch("feat-foo/bar")
+
+    expect(path1).not.toBe(path2)
+    expect(path1).toContain("feat~foo-bar")
+    expect(path2).toContain("feat-foo~bar")
   })
 
   test("fails when plugin name does not exist in the repo", async () => {
