@@ -18,10 +18,10 @@ command git status
 command git diff HEAD
 command git branch --show-current
 command git log --oneline -10
-command git rev-parse --abbrev-ref origin/HEAD | sed 's@^origin/@@'
+command git rev-parse --abbrev-ref origin/HEAD
 ```
 
-The last command returns the repo's default branch name (e.g., `main`). If it fails, fall back to `main`.
+The last command returns the remote default branch (e.g., `origin/main`). Strip the `origin/` prefix to get the branch name. If the command fails or returns a bare `HEAD`, fall back to `main`.
 
 If there are no changes, report that and stop.
 
@@ -82,9 +82,9 @@ Use this fallback chain. Stop at the first that succeeds:
    Match the `owner/repo` from the PR URL against the fetch URLs. Use the matching remote as the base remote. If no remote matches, fall back to `origin`.
 2. **`origin/HEAD` symbolic ref:**
    ```bash
-   command git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's@^origin/@@'
+   command git symbolic-ref --quiet --short refs/remotes/origin/HEAD
    ```
-   Use `origin` as the base remote.
+   Strip the `origin/` prefix from the result. Use `origin` as the base remote.
 3. **GitHub default branch metadata:**
    ```bash
    command gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
