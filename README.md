@@ -127,16 +127,41 @@ All provider targets are experimental and may change as the formats evolve.
 
 ---
 
-## Installing from a Branch
+## Local Development
 
-When working with worktrees or testing someone else's branch, `./plugins/compound-engineering` points to whatever branch your main checkout is on -- not the branch you want. Use `--branch` to install from a pushed branch without switching checkouts.
+### From your local checkout
+
+For active development -- edits to the plugin source are reflected immediately.
+
+**Claude Code** -- add a shell alias so your local copy loads alongside your normal plugins:
+
+```bash
+alias cce='claude --plugin-dir ~/code/compound-engineering-plugin/plugins/compound-engineering'
+```
+
+Run `cce` instead of `claude` to test your changes. Your production install stays untouched.
+
+**Codex and other targets** -- run the local CLI against your checkout:
+
+```bash
+# from the repo root
+bun run src/index.ts install ./plugins/compound-engineering --to codex
+
+# same pattern for other targets
+bun run src/index.ts install ./plugins/compound-engineering --to opencode
+```
+
+### From a pushed branch
+
+For testing someone else's branch or your own branch from a worktree, without switching checkouts. Uses `--branch` to clone the branch to a deterministic cache directory.
 
 > **Unpushed local branches**: If the branch exists only in a local worktree and hasn't been pushed, point `--plugin-dir` directly at the worktree path instead (e.g. `claude --plugin-dir /path/to/worktree/plugins/compound-engineering`).
 
-**Claude Code** -- use `plugin-path` to clone the branch to a stable cache directory:
+**Claude Code** -- use `plugin-path` to get the cached clone path:
 
 ```bash
-bunx @every-env/compound-plugin plugin-path compound-engineering --branch feat/new-agents
+# from the repo root
+bun run src/index.ts plugin-path compound-engineering --branch feat/new-agents
 # Output:
 #   claude --plugin-dir ~/.cache/compound-engineering/branches/compound-engineering-feat~new-agents/plugins/compound-engineering
 ```
@@ -146,78 +171,52 @@ The cache path is deterministic (same branch always maps to the same directory).
 **Codex, OpenCode, and other targets** -- pass `--branch` to `install`:
 
 ```bash
-# install from a specific branch
-bunx @every-env/compound-plugin install compound-engineering --to codex --branch feat/new-agents
+# from the repo root
+bun run src/index.ts install compound-engineering --to codex --branch feat/new-agents
 
 # works with any target
-bunx @every-env/compound-plugin install compound-engineering --to opencode --branch feat/new-agents
+bun run src/index.ts install compound-engineering --to opencode --branch feat/new-agents
 
 # combine with --also for multiple targets
-bunx @every-env/compound-plugin install compound-engineering --to codex --also opencode --branch feat/new-agents
+bun run src/index.ts install compound-engineering --to codex --also opencode --branch feat/new-agents
 ```
 
 Both features use the `COMPOUND_PLUGIN_GITHUB_SOURCE` env var to resolve the repository, defaulting to `https://github.com/EveryInc/compound-engineering-plugin`.
 
-**Shell aliases** -- `plugin-path` prints just the path to stdout (progress goes to stderr), so it composes with `$()`:
+### Shell aliases
+
+Add to `~/.zshrc` or `~/.bashrc`. All aliases use the local CLI so there's no dependency on npm publishing. `plugin-path` prints just the path to stdout (progress goes to stderr), so it composes with `$()`.
 
 ```bash
-# add to ~/.zshrc or ~/.bashrc
+CE_REPO=~/code/compound-engineering-plugin
 
-# Launch Claude Code with a specific plugin branch (extra args forwarded to claude)
-claude-ce-branch() {
-  claude --plugin-dir "$(bunx @every-env/compound-plugin plugin-path compound-engineering --branch "$1")" "${@:2}"
+ce-cli() { bun run "$CE_REPO/src/index.ts" "$@"; }
+
+# --- Local checkout (active development) ---
+alias cce='claude --plugin-dir $CE_REPO/plugins/compound-engineering'
+
+codex-ce() {
+  ce-cli install "$CE_REPO/plugins/compound-engineering" --to codex "$@"
 }
 
-# Install a branch to Codex
-codex-ce-branch() {
-  bunx @every-env/compound-plugin install compound-engineering --to codex --branch "$1"
+# --- Pushed branch (testing PRs, worktree workflows) ---
+ccb() {
+  claude --plugin-dir "$(ce-cli plugin-path compound-engineering --branch "$1")" "${@:2}"
+}
+
+codex-ceb() {
+  ce-cli install compound-engineering --to codex --branch "$1" "${@:2}"
 }
 ```
 
 Usage:
 
 ```bash
-# Test someone's branch with Claude Code
-claude-ce-branch feat/new-agents
-
-# Pass extra flags through to claude
-claude-ce-branch feat/new-agents --verbose
-
-# Install a branch for Codex
-codex-ce-branch feat/new-agents
-```
-
----
-
-## Local Development
-
-When developing and testing local changes to the plugin:
-
-**Claude Code** -- add a shell alias so your local copy loads alongside your normal plugins:
-
-```bash
-# add to ~/.zshrc or ~/.bashrc
-alias claude-dev-ce='claude --plugin-dir ~/code/compound-engineering-plugin/plugins/compound-engineering'
-```
-
-One-liner to append it:
-
-```bash
-echo "alias claude-dev-ce='claude --plugin-dir ~/code/compound-engineering-plugin/plugins/compound-engineering'" >> ~/.zshrc
-```
-
-Then run `claude-dev-ce` instead of `claude` to test your changes. Your production install stays untouched.
-
-**Codex** -- point the install command at your local path:
-
-```bash
-bun run src/index.ts install ./plugins/compound-engineering --to codex
-```
-
-**Other targets** -- same pattern, swap the target:
-
-```bash
-bun run src/index.ts install ./plugins/compound-engineering --to opencode
+cce                              # local checkout with Claude Code
+codex-ce                         # install local checkout to Codex
+ccb feat/new-agents              # test a pushed branch with Claude Code
+ccb feat/new-agents --verbose    # extra flags forwarded to claude
+codex-ceb feat/new-agents        # install a pushed branch to Codex
 ```
 
 ---
