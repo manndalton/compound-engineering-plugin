@@ -153,7 +153,10 @@ For each relevant document, return a summary in this format:
 
 ## Frontmatter Schema Reference
 
-Reference the [yaml-schema.md](../../skills/compound-docs/references/yaml-schema.md) for the complete schema. Key enum values:
+Use this on-demand schema reference when you need the full contract:
+`../../skills/ce-compound/references/yaml-schema.md`
+
+Key enum values:
 
 **problem_type values:**
 - build_error, test_failure, runtime_error, performance_issue

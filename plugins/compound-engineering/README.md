@@ -74,7 +74,6 @@ The primary entry points for engineering work, invoked as slash commands:
 
 | Skill | Description |
 |-------|-------------|
-| `compound-docs` | Capture solved problems as categorized documentation |
 | `every-style-editor` | Review copy for Every's style guide compliance |
 | `proof` | Create, edit, and share documents via Proof collaborative editor |
 | `todo-create` | File-based todo tracking system |
