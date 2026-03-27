@@ -41,7 +41,8 @@ gh pr view --json url,title,state
 
 Interpret the result. Do not treat every non-zero exit as a fatal error here:
 
-- If it returns PR data, an open PR exists for the current branch.
+- If it returns PR data with `state: OPEN`, an open PR exists for the current branch.
+- If it returns PR data with a non-OPEN state (CLOSED, MERGED), treat this as "no open PR." Report that no open PR exists for this branch and stop.
 - If it exits non-zero and the output indicates that no pull request exists for the current branch, treat that as the normal "no PR for this branch" state. Report that no open PR exists for this branch and stop.
 - If it errors for another reason (auth, network, repo config), report the error and stop.
 
@@ -133,7 +134,8 @@ gh pr view --json url,title,state
 
 Interpret the result. Do not treat every non-zero exit as a fatal error here:
 
-- If it **returns PR data**, an open PR exists for the current branch. Note the URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
+- If it **returns PR data with `state: OPEN`**, an open PR exists for the current branch. Note the URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
+- If it **returns PR data with a non-OPEN state** (CLOSED, MERGED), treat this the same as "no PR exists" -- the previous PR is done and a new one is needed. Continue to Step 4 through Step 8 as normal.
 - If it **exits non-zero and the output indicates that no pull request exists for the current branch**, no PR exists. Continue to Step 4 through Step 8 as normal.
 - If it **errors** (auth, network, repo config), report the error to the user and stop.
 
