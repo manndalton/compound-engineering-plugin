@@ -121,7 +121,7 @@ Fingerprint each finding using `normalize(section) + normalize(title)`. Normaliz
 When fingerprints match across personas:
 - If the findings recommend **opposing actions** (e.g., one says cut, the other says keep), do not merge -- preserve both for contradiction resolution in 3.5
 - Otherwise merge: keep the highest severity, keep the highest confidence, union all evidence arrays, note all agreeing reviewers (e.g., "coherence, feasibility")
-- **Coverage attribution:** Attribute the merged finding to the persona with the highest confidence. The other persona's finding count decreases by one for Coverage table purposes.
+- **Coverage attribution:** Attribute the merged finding to the persona with the highest confidence. Decrement the losing persona's Findings count *and* the corresponding route bucket (Auto, Batch, or Present) so `Findings = Auto + Batch + Present` stays exact.
 
 ### 3.4 Promote Residual Concerns
 
