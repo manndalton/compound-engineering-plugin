@@ -13,6 +13,28 @@ If the user is asking to update, refresh, or rewrite an existing PR description 
 
 For description-only updates, follow the Description Update workflow below. Otherwise, follow the full workflow.
 
+## Reusable PR probe
+
+When checking whether the current branch already has a PR, keep using current-branch `gh pr view` semantics. Do **not** switch to `gh pr list --head "<branch>"` just to avoid the no-PR exit path. That branch-name search can select the wrong PR in multi-fork repos.
+
+Also do **not** run bare `gh pr view --json ...` in a way that lets the shell tool render the expected no-PR state as a red failed step. Capture the output and exit code yourself so you can interpret "no PR for this branch" as normal workflow state:
+
+```bash
+if PR_VIEW_OUTPUT=$(gh pr view --json url,title,state 2>&1); then
+  PR_VIEW_EXIT=0
+else
+  PR_VIEW_EXIT=$?
+fi
+printf '%s\n__GH_PR_VIEW_EXIT__=%s\n' "$PR_VIEW_OUTPUT" "$PR_VIEW_EXIT"
+```
+
+Interpret the result this way:
+
+- `__GH_PR_VIEW_EXIT__=0` and JSON with `state: OPEN` -> an open PR exists for the current branch
+- `__GH_PR_VIEW_EXIT__=0` and JSON with a non-OPEN state -> treat as no open PR
+- non-zero exit with output indicating `no pull requests found for branch` -> expected no-PR state
+- any other non-zero exit -> real error (auth, network, repo config, etc.)
+
 ---
 
 ## Description Update workflow
@@ -36,10 +58,15 @@ If empty (detached HEAD), report that there is no branch to update and stop.
 Otherwise, check for an existing open PR:
 
 ```bash
-gh pr view --json url,title,state
+if PR_VIEW_OUTPUT=$(gh pr view --json url,title,state 2>&1); then
+  PR_VIEW_EXIT=0
+else
+  PR_VIEW_EXIT=$?
+fi
+printf '%s\n__GH_PR_VIEW_EXIT__=%s\n' "$PR_VIEW_OUTPUT" "$PR_VIEW_EXIT"
 ```
 
-Interpret the result. Do not treat every non-zero exit as a fatal error here:
+Interpret the result using the Reusable PR probe rules above:
 
 - If it returns PR data with `state: OPEN`, an open PR exists for the current branch.
 - If it returns PR data with a non-OPEN state (CLOSED, MERGED), treat this as "no open PR." Report that no open PR exists for this branch and stop.
@@ -129,10 +156,15 @@ Run `git branch --show-current` to get the current branch name. If it returns an
 Then check for an existing open PR:
 
 ```bash
-gh pr view --json url,title,state
+if PR_VIEW_OUTPUT=$(gh pr view --json url,title,state 2>&1); then
+  PR_VIEW_EXIT=0
+else
+  PR_VIEW_EXIT=$?
+fi
+printf '%s\n__GH_PR_VIEW_EXIT__=%s\n' "$PR_VIEW_OUTPUT" "$PR_VIEW_EXIT"
 ```
 
-Interpret the result. Do not treat every non-zero exit as a fatal error here:
+Interpret the result using the Reusable PR probe rules above:
 
 - If it **returns PR data with `state: OPEN`**, an open PR exists for the current branch. Note the URL and continue to Step 4 (commit) and Step 5 (push). Then skip to Step 7 (existing PR flow) instead of creating a new PR.
 - If it **returns PR data with a non-OPEN state** (CLOSED, MERGED), treat this the same as "no PR exists" -- the previous PR is done and a new one is needed. Continue to Step 4 through Step 8 as normal.
@@ -205,11 +237,11 @@ Once the base branch and remote are known:
    ```bash
    git merge-base <base-remote>/<base-branch> HEAD
    ```
-2. List all commits unique to this branch:
+3. List all commits unique to this branch:
    ```bash
    git log --oneline <merge-base>..HEAD
    ```
-3. Get the full diff a reviewer will see:
+4. Get the full diff a reviewer will see:
    ```bash
    git diff <merge-base>...HEAD
    ```
