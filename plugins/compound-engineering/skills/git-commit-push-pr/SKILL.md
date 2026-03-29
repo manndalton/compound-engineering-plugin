@@ -289,6 +289,39 @@ Use this to select the right description depth:
 - **No empty sections**: If a section (like "Breaking Changes" or "Migration Guide") doesn't apply, omit it entirely. Do not include it with "N/A" or "None".
 - **Test plan -- only when it adds value**: Include a test plan section when the testing approach is non-obvious: edge cases the reviewer might not think of, verification steps for behavior that's hard to see in the diff, or scenarios that require specific setup. Omit it for straightforward changes where the tests are self-explanatory or where "run the tests" is the only useful guidance. A test plan for "verify the typo is fixed" is noise.
 
+#### Visual communication
+
+Include a visual aid when the PR changes something structurally complex enough that a reviewer would struggle to reconstruct the mental model from prose alone. Visual aids are conditional on content patterns -- what the PR changes -- not on PR size. A small PR that restructures a complex workflow may warrant a diagram; a large mechanical refactor may not.
+
+The bar for including visual aids in PR descriptions is higher than in brainstorms or plans. Reviewers scan PR descriptions to orient before reading the diff -- visuals must earn their space quickly.
+
+**When to include:**
+
+| PR changes... | Visual aid | Placement |
+|---|---|---|
+| Architecture touching 3+ interacting components or services | Mermaid component or interaction diagram | Within the approach or changes section |
+| A multi-step workflow, pipeline, or data flow with non-obvious sequencing | Mermaid flow diagram | After the summary or within the changes section |
+| 3+ behavioral modes, states, or variants being introduced or changed | Markdown comparison table | Within the relevant section |
+| Before/after performance data, behavioral differences, or option trade-offs | Markdown table (see the "Markdown tables for data" writing principle above) | Inline with the data being discussed |
+| Data model changes with 3+ related entities or relationship changes | Mermaid ERD or relationship diagram | Within the changes section |
+
+**When to skip:**
+- The change is small or simple -- if the sizing table routes to "1-2 sentences" or "3-5 sentences", skip visual aids
+- Prose already communicates the change clearly
+- The diagram would just restate the diff in visual form without adding comprehension value
+- The change is mechanical (renames, dependency bumps, config changes, formatting)
+- The PR description is already short enough that a diagram would be heavier than the prose around it
+
+**Format selection:**
+- **Mermaid** (default) for flow diagrams, interaction diagrams, and dependency graphs -- 5-10 nodes typical for a PR description, up to 15 only for genuinely complex changes. Use `TB` (top-to-bottom) direction so diagrams stay narrow in both rendered and source form. Source should be readable as fallback in diff views, email notifications, and Slack previews.
+- **ASCII/box-drawing diagrams** for annotated flows that need rich in-box content -- decision logic branches, file path layouts, step-by-step transformations with annotations. More expressive than mermaid when the diagram's value comes from annotations within steps. Follow 80-column max for code blocks, use vertical stacking.
+- **Markdown tables** for mode/variant comparisons, before/after data, and decision matrices.
+- Keep diagrams proportionate to the change. A PR touching a 5-component interaction gets 5-8 nodes. A larger architectural change may need 10-15 nodes -- that is fine if every node earns its place.
+- Place inline at the point of relevance within the description, not in a separate "Diagrams" section.
+- Prose is authoritative: when a visual aid and surrounding description prose disagree, the prose governs.
+
+After generating a visual aid, verify it accurately represents the change described in the PR -- correct components, no missing interactions, no merged steps. Diagrams derived from a diff (rather than from code analysis) carry higher inaccuracy risk.
+
 #### Numbering and references
 
 **Never prefix list items with `#`** in PR descriptions. GitHub interprets `#1`, `#2`, etc. as issue/PR references and auto-links them. Instead of:
