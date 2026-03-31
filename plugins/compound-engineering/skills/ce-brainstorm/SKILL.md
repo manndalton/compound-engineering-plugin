@@ -267,6 +267,7 @@ Before finalizing, check:
 - Do any requirements depend on something claimed to be out of scope?
 - Are any unresolved items actually product decisions rather than planning questions?
 - Did implementation details leak in when they shouldn't have?
+- Do any requirements assert that infrastructure is absent ("table X does not exist", "no existing config for Y") without that claim having been verified against the codebase? If so, verify now or label as an unverified assumption.
 - Is there a low-cost change that would make this materially more useful?
 - Would a visual aid (flow diagram, comparison table, relationship diagram) help a reader grasp the requirements faster than prose alone?
 
