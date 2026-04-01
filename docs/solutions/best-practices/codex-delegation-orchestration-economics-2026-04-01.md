@@ -77,6 +77,23 @@ Environment guard, CLI availability, and consent checks run once before the firs
 **5. Batch scratch cleanup.**
 Clean up `.context/` delegation artifacts at end-of-plan, not per-unit. Fewer tool calls, same outcome.
 
+### Plan Quality Enables Good Delegation Decisions
+
+Every delegation decision — whether to delegate, how to batch, what to include in the prompt — depends on what the plan file provides. The orchestrator can only be as smart as the plan it reads.
+
+| Plan signal | What it enables |
+|-------------|----------------|
+| Unit count and scope | The crossover decision (5-7 unit threshold) |
+| File lists per unit | "Don't split units that share files" batching rule |
+| Test scenarios per unit | Forwarded to Codex via the `<testing>` prompt section; thin plan scenarios produce thin Codex tests regardless of prompt engineering |
+| Verification commands | Become the `<verify>` section; missing verification means Codex cannot confirm its own work |
+| Triviality signals (Goal, Approach) | Whether delegation is considered at all ("config change" vs "recursive validation engine") |
+| Dependencies between units | Batch boundary decisions for plans >5 units |
+
+A well-structured ce:plan output provides all of these. A hand-written requirements doc or TODO list may provide few or none — the delegation logic still works (the skill handles non-standard plans), but the decisions are less informed. For example, without explicit file lists, the batching rule cannot check for shared files; without test scenarios, the Codex prompt's `<testing>` section has nothing to supplement.
+
+This does not mean delegation requires ce:plan output. It means the quality of delegation improves proportionally with the structure of the plan. Users who invest in structured plans get smarter delegation decisions. Users with lightweight plans get delegation that works but makes conservative choices (e.g., single-batch everything, generic test guidance).
+
 ### Prompt Engineering for Delegation Quality
 
 Without explicit testing guidance, Codex produces 15-43% fewer tests than Claude. Three prompt additions close this gap:
