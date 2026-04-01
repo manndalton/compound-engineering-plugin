@@ -162,7 +162,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
 
 4. **Choose Execution Strategy**
 
-   **Delegation routing gate:** If `delegation_active` is true AND the input is a plan file (not a bare prompt), force **serial inline execution** for all units. Delegation mode requires serial execution because each unit must start from a clean working tree after the prior unit's commit or rollback. Skip the strategy table below and proceed directly to Phase 2. If delegation is active but the input is a bare prompt (no plan file), set `delegation_active` to false with a brief note: "Delegation requires a plan file -- using standard mode." and continue with the standard strategy selection below.
+   **Delegation routing gate:** If `delegation_active` is true AND the input is a plan file (not a bare prompt), run the Pre-Delegation Checks (see Codex Delegation Mode section) now — before choosing a strategy. If all checks pass and `delegation_active` is still true, force **serial inline execution** for all units and proceed directly to Phase 2. If any check disables delegation (`delegation_active` becomes false), fall through to the standard strategy table below and select normally based on plan size and dependency structure. If delegation is active but the input is a bare prompt (no plan file), set `delegation_active` to false with a brief note: "Delegation requires a plan file -- using standard mode." and continue with the standard strategy selection below.
 
    After creating the task list, decide how to execute based on the plan's size and dependency structure:
 
