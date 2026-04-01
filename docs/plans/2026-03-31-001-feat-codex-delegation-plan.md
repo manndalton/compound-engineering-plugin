@@ -35,7 +35,7 @@ Users running ce:work from Claude Code (or other non-Codex agents) want to deleg
 - R19. Multi-signal failure classification (CLI fail / result absent / task fail / partial / verify fail / success)
 - R20. `--output-schema` for structured result JSON; known gpt-5-codex model bug
 - R21. Repo-root restriction via prompt constraint; complete-and-report on out-of-repo discovery
-- R22. Settings in `.claude/compound-engineering.local.md`: `work_delegate`, `work_codex_consent`, `work_codex_sandbox`
+- R22. Settings in `.claude/compound-engineering.local.md`: `work_delegate`, `work_delegate_consent`, `work_delegate_sandbox`
 
 ## Scope Boundaries
 
@@ -170,7 +170,7 @@ graph TB
 **Approach:**
 - Add an `## Argument Parsing` section immediately before the `## Phase 0: Input Triage` heading (after the opening narrative), following ce:review's canonical pattern (token table, strip-before-interpret). Cross-reference the High-Level Technical Design diagram for placement.
 - Token table: `delegate:codex` (activate), `delegate:local` (deactivate), plus bounded fuzzy recognition for delegate activation phrases. Do not add `mode:headless` here; ce:work remains an interactive workflow.
-- After token extraction, read `.claude/compound-engineering.local.md` for `work_delegate`, `work_codex_consent`, `work_codex_sandbox` keys
+- After token extraction, read `.claude/compound-engineering.local.md` for `work_delegate`, `work_delegate_consent`, `work_delegate_sandbox` keys
 - Implement resolution chain: argument flag > local.md `work_delegate` > hard default `false`
 - Store resolved delegation state (on/off) and sandbox mode in skill-level variables for downstream consumption
 - Update the `argument-hint` frontmatter to include `delegate:codex` for discoverability
@@ -217,7 +217,7 @@ graph TB
 - Add a `### Pre-Delegation Checks` subsection within the new Codex Delegation Mode section
 - **Environment guard:** Check `$CODEX_SANDBOX` and `$CODEX_SESSION_ID`. If set, disable delegation. Notify only when user explicitly requested delegation (via argument); proceed silently when delegation was enabled via local.md default only.
 - **Availability check:** `command -v codex`. If not found, fall back to standard mode with notification.
-- **Consent flow:** If `work_codex_consent` is not `true` in local.md:
+- **Consent flow:** If `work_delegate_consent` is not `true` in local.md:
   - Show one-time warning explaining `--yolo`, present sandbox mode choice (yolo recommended, full-auto option), record decision to local.md
 - **Consent decline path:** Ask whether to disable delegation entirely; if yes, set `work_delegate: false` in local.md
 - Follow learning: re-read git/file state at each transition rather than caching (state machine pattern)

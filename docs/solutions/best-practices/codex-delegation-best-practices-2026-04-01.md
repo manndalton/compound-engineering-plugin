@@ -148,7 +148,7 @@ Users may prefer delegation even when it is not optimal for Claude token savings
 - **Coding preference** — they may prefer Codex's implementation style for certain tasks
 - **Usage conservation** — they may want to conserve Claude Code usage specifically
 
-The `work_delegation_decision` setting (`auto`/`ask`) supports this. In `ask` mode, the skill presents a recommendation with rationale but lets the user override. When recommending against delegation: "Codex delegation active, but these are small changes where the cost of delegating outweighs having Claude Code do them." The user can still choose "Delegate to Codex anyway."
+The `work_delegate_decision` setting (`auto`/`ask`) supports this. In `ask` mode, the skill presents a recommendation with rationale but lets the user override. When recommending against delegation: "Codex delegation active, but these are small changes where the cost of delegating outweighs having Claude Code do them." The user can still choose "Delegate to Codex anyway."
 
 ---
 

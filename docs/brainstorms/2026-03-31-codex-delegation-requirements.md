@@ -46,7 +46,7 @@ ce-work-beta does have a structured 7-step External Delegate Mode (environment g
          ▼
 ┌──────────────────────────┐     ┌───────────────────────┐
 │ Consent + mode selection  │────>│ Ask: disable          │
-│ work_codex_consent set?   │ no  │ delegation?           │
+│ work_delegate_consent set?   │ no  │ delegation?           │
 │ Show warning + sandbox    │     │ Set local.md          │
 │ mode choice (yolo/full-   │     └───────────────────────┘
 │ auto). Recommend yolo.    │
@@ -107,9 +107,9 @@ ce-work-beta does have a structured 7-step External Delegate Mode (environment g
 - R10. First time delegation activates in a project, show a one-time consent flow that: (1) explains what delegation does and the security implications, (2) presents the sandbox mode choice with a recommendation, and (3) records the user's decisions. The sandbox modes are:
   - **yolo** (recommended): Maps to `--yolo` (`--dangerously-bypass-approvals-and-sandbox`). Full system access including network. Required for verification steps that run tests or install dependencies. Explain why this is recommended.
   - **full-auto**: Maps to `--full-auto`. Workspace-write sandbox, no network access. Tests/installs that need network will fail. Suitable for pure code-writing tasks without verification dependencies.
-- R11. On user acceptance, store `work_codex_consent: true` and `work_codex_sandbox: yolo` (or `full-auto`) in `.claude/compound-engineering.local.md`. Do not show the consent flow again for this project.
+- R11. On user acceptance, store `work_delegate_consent: true` and `work_delegate_sandbox: yolo` (or `full-auto`) in `.claude/compound-engineering.local.md`. Do not show the consent flow again for this project.
 - R12. On user decline, ask whether to disable codex delegation entirely. If yes, set `work_delegate: false` in local.md and proceed in standard mode.
-- R13. In headless mode, delegation proceeds only if `work_codex_consent` is already `true` in local.md. If not set or `false`, fall back to standard mode silently. Headless runs never prompt for consent and never silently escalate to unsandboxed mode without prior interactive consent.
+- R13. In headless mode, delegation proceeds only if `work_delegate_consent` is already `true` in local.md. If not set or `false`, fall back to standard mode silently. Headless runs never prompt for consent and never silently escalate to unsandboxed mode without prior interactive consent.
 
 **Execution Mechanism**
 
@@ -132,7 +132,7 @@ ce-work-beta does have a structured 7-step External Delegate Mode (environment g
 
   The agent executes this verbatim — no improvisation of CLI syntax.
 
-- R15. Sandbox posture defaults to `yolo` (`--yolo`, shorthand for `--dangerously-bypass-approvals-and-sandbox`) but the user may choose `full-auto` during the consent flow (R10). The choice is stored in `work_codex_sandbox` in local.md. `yolo` is recommended because `--full-auto` blocks network access, which is required for verification steps (running tests, installing dependencies). If `full-auto` is chosen and causes repeated verification failures, the circuit breaker (R18) handles fallback.
+- R15. Sandbox posture defaults to `yolo` (`--yolo`, shorthand for `--dangerously-bypass-approvals-and-sandbox`) but the user may choose `full-auto` during the consent flow (R10). The choice is stored in `work_delegate_sandbox` in local.md. `yolo` is recommended because `--full-auto` blocks network access, which is required for verification steps (running tests, installing dependencies). If `full-auto` is chosen and causes repeated verification failures, the circuit breaker (R18) handles fallback.
 
 - R16. When delegation mode is active, ALL units execute serially — both delegated and locally-executed units. Git stash is a global stack; mixing parallel and serial execution on the same working tree causes stash entanglement. This means delegation mode and swarm mode (Agent Teams) are mutually exclusive. Before each delegated unit, the loop assumes a clean working tree (enforced by ce:work's Phase 1 setup and by mandatory commits after each successful unit). Snapshot the working tree via named stash: `git stash push --include-untracked -m "ce-codex-<unit-id>"`. On failure, rollback via `git checkout -- . && git clean -fd && git stash drop "$(git stash list | grep 'ce-codex-<unit-id>' | head -1 | cut -d: -f1)"`. On success, commit the changes, then drop the named stash.
 
@@ -175,8 +175,8 @@ ce-work-beta does have a structured 7-step External Delegate Mode (environment g
 
 - R22. New YAML frontmatter keys in `.claude/compound-engineering.local.md`:
   - `work_delegate`: `codex`/`false` (default: `false`) — delegation target when enabled
-  - `work_codex_consent`: `true`/`false` — whether the user has completed the one-time consent flow
-  - `work_codex_sandbox`: `yolo`/`full-auto` (default: `yolo`) — sandbox posture for codex exec
+  - `work_delegate_consent`: `true`/`false` — whether the user has completed the one-time consent flow
+  - `work_delegate_sandbox`: `yolo`/`full-auto` (default: `yolo`) — sandbox posture for codex exec
 
 ## Success Criteria
 

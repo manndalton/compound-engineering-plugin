@@ -45,15 +45,15 @@ After extracting tokens from arguments, resolve the delegation state using this 
 To read local.md: open the file, extract content between the opening and closing `---` delimiters (YAML frontmatter), and interpret the keys. If the file is missing, empty, or has malformed frontmatter, treat all settings as absent and fall through to hard defaults.
 
 Also read from local.md when present:
-- `work_codex_consent` -- `true` if the user has completed the one-time consent flow
-- `work_codex_sandbox` -- `yolo` (default) or `full-auto` -- sandbox posture for codex exec
-- `work_delegation_decision` -- `auto` (default, skill decides and proceeds) or `ask` (present recommendation, wait for user choice before proceeding)
+- `work_delegate_consent` -- `true` if the user has completed the one-time consent flow
+- `work_delegate_sandbox` -- `yolo` (default) or `full-auto` -- sandbox posture for codex exec
+- `work_delegate_decision` -- `auto` (default, skill decides and proceeds) or `ask` (present recommendation, wait for user choice before proceeding)
 
 Store the resolved state for downstream consumption:
 - `delegation_active` -- boolean, whether delegation mode is on
 - `delegation_source` -- `argument` or `local.md` or `default` -- how delegation was resolved (used by environment guard to decide notification verbosity)
 - `sandbox_mode` -- `yolo` or `full-auto` (from local.md or default `yolo`)
-- `consent_granted` -- boolean (from local.md `work_codex_consent`)
+- `consent_granted` -- boolean (from local.md `work_delegate_consent`)
 
 ---
 

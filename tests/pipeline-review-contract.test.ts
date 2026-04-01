@@ -203,7 +203,7 @@ describe("ce:work-beta codex delegation contract", () => {
     const content = await readRepoFile("plugins/compound-engineering/skills/ce-work-beta/references/codex-delegation-workflow.md")
 
     expect(content).toContain("## Delegation Decision")
-    expect(content).toContain("work_delegation_decision")
+    expect(content).toContain("work_delegate_decision")
     expect(content).toContain("Execute with Claude Code instead")
     expect(content).toContain("Delegate to Codex anyway")
     expect(content).toContain("the cost of delegating outweighs having Claude Code do them")
@@ -212,7 +212,7 @@ describe("ce:work-beta codex delegation contract", () => {
   test("settings resolution includes delegation decision setting", async () => {
     const content = await readRepoFile("plugins/compound-engineering/skills/ce-work-beta/SKILL.md")
 
-    expect(content).toContain("work_delegation_decision")
+    expect(content).toContain("work_delegate_decision")
     expect(content).toContain("`auto`")
     expect(content).toContain("`ask`")
   })

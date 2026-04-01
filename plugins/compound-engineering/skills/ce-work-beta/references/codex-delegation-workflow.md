@@ -4,7 +4,7 @@ When `delegation_active` is true, code implementation is delegated to the Codex 
 
 ## Delegation Decision
 
-If `work_delegation_decision` is `ask`, present the recommendation before proceeding.
+If `work_delegate_decision` is `ask`, present the recommendation before proceeding.
 
 **When recommending Codex delegation:**
 
@@ -24,7 +24,7 @@ If `work_delegation_decision` is `ask`, present the recommendation before procee
 > 1. Execute with Claude Code *(recommended)*
 > 2. Delegate to Codex anyway
 
-If `work_delegation_decision` is `auto` (the default), state the execution plan in one line and proceed without waiting: "Codex delegation active. Delegating [N] units in [X] batch(es)." or "Codex delegation active. All units are trivial -- executing with Claude Code."
+If `work_delegate_decision` is `auto` (the default), state the execution plan in one line and proceed without waiting: "Codex delegation active. Delegating [N] units in [X] batch(es)." or "Codex delegation active. All units are trivial -- executing with Claude Code."
 
 ## Pre-Delegation Checks
 
@@ -61,7 +61,7 @@ If the Codex CLI is not on PATH: emit "Codex CLI not found -- using standard mod
 
 **3. Consent Flow**
 
-If `consent_granted` is not true (from local.md `work_codex_consent`):
+If `consent_granted` is not true (from local.md `work_delegate_consent`):
 
 Present a one-time consent warning using the platform's blocking question tool (AskUserQuestion in Claude Code). The consent warning explains:
 - Delegation sends implementation units to `codex exec` as a structured prompt
@@ -71,7 +71,7 @@ Present a one-time consent warning using the platform's blocking question tool (
 Present the sandbox mode choice: (1) yolo (recommended), (2) full-auto.
 
 On acceptance:
-- Write `work_codex_consent: true` and `work_codex_sandbox: <chosen-mode>` to `.claude/compound-engineering.local.md` YAML frontmatter
+- Write `work_delegate_consent: true` and `work_delegate_sandbox: <chosen-mode>` to `.claude/compound-engineering.local.md` YAML frontmatter
 - To write local.md: (1) if file does not exist, create it with YAML frontmatter wrapper; (2) if file exists with valid frontmatter, merge new keys preserving existing keys; (3) if file exists without frontmatter or with malformed frontmatter, prepend a valid frontmatter block and preserve existing body content below the closing `---`
 - Update `consent_granted` and `sandbox_mode` in the resolved state
 
@@ -80,7 +80,7 @@ On decline:
 - If yes: write `work_delegate: false` to local.md, set `delegation_active` to false, proceed in standard mode
 - If no: set `delegation_active` to false for this invocation only, proceed in standard mode
 
-**Headless consent:** If running in a headless or non-interactive context, delegation proceeds only if `work_codex_consent` is already `true` in local.md. If consent is not recorded, set `delegation_active` to false silently.
+**Headless consent:** If running in a headless or non-interactive context, delegation proceeds only if `work_delegate_consent` is already `true` in local.md. If consent is not recorded, set `delegation_active` to false silently.
 
 ## Batching
 
