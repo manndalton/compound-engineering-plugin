@@ -197,10 +197,11 @@ This intentionally ignores untracked files. Only staged or unstaged modification
 
 If tracked files are dirty, stop and present options: (1) commit current changes, (2) stash explicitly (`git stash push -m "pre-delegation"`), (3) continue in standard mode (sets `delegation_active` to false). Do not auto-stash user changes.
 
-**Delegation invocation:** For each batch:
+**Delegation invocation:** For each batch, execute these as **separate Bash tool calls** (not combined into one):
 
-1. Write the prompt file using the Prompt Template above
-2. Launch the Codex CLI in the **background** (no timeout ceiling):
+**Step A — Launch (background, separate Bash call):**
+
+Write the prompt file, then make a single Bash tool call with `run_in_background: true` set on the tool parameter. This call returns immediately and has no timeout ceiling.
 
 ```bash
 # Resolve sandbox flag
@@ -219,13 +220,15 @@ codex exec \
   - < .context/compound-engineering/codex-delegation/<run-id>/prompt-batch-<batch-num>.md
 ```
 
-Run this command with `run_in_background: true` so there is no timeout ceiling. Codex batches can take 5-20+ minutes depending on plan size and test-fix iterations.
+Critical: `run_in_background: true` must be set as a **Bash tool parameter**, not as a shell `&` suffix. The tool parameter is what removes the timeout ceiling. A shell `&` inside a foreground Bash call still hits the 2-minute default timeout.
 
-Quoting is critical for the `-c` flag: use single quotes around the entire key=value and double quotes around the TOML string value inside. Example: `-c 'model_reasoning_effort="high"'`. The `-m` value does not need special quoting unless the model name contains spaces.
+Quoting is critical for the `-c` flag: use single quotes around the entire key=value and double quotes around the TOML string value inside. Example: `-c 'model_reasoning_effort="high"'`.
 
 Do not improvise CLI flags or modify this invocation template.
 
-3. **Poll for completion.** Immediately after launching, enter a foreground polling loop that checks every 10 seconds whether the result file exists. This keeps the agent's turn active so the user cannot interfere with the working tree during delegation.
+**Step B — Poll (foreground, separate Bash calls):**
+
+After the launch call returns, make a **new, separate** foreground Bash tool call that polls for the result file. This keeps the agent's turn active so the user cannot interfere with the working tree.
 
 ```bash
 RESULT_FILE=".context/compound-engineering/codex-delegation/<run-id>/result-batch-<batch-num>.json"
@@ -236,7 +239,7 @@ done
 echo "Waiting for Codex..."
 ```
 
-If the output is "Waiting for Codex...", issue the same polling command again. Repeat until the result file appears. When the output is "DONE", read the result file and proceed to classification.
+If the output is "Waiting for Codex...", issue the same polling command again as another separate Bash call. Repeat until the output is "DONE", then read the result file and proceed to classification.
 
 **Result classification:** Codex is responsible for running verification internally and fixing failures before reporting -- the orchestrator does not re-run verification independently.
 
