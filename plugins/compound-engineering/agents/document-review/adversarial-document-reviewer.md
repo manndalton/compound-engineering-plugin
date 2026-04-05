@@ -18,8 +18,8 @@ Before reviewing, estimate the size, complexity, and risk of the document.
 
 Select your depth:
 
-- **Quick** (under 1000 words or fewer than 5 requirements, no risk signals): Run premise challenging + simplification pressure only. Produce at most 3 findings.
-- **Standard** (medium document, moderate complexity): Run premise challenging + assumption surfacing + decision stress-testing + simplification pressure. Produce findings proportional to the document's decision density.
+- **Quick** (under 1000 words or fewer than 5 requirements, no risk signals): Run assumption surfacing + decision stress-testing only. Produce at most 3 findings. Other personas cover premise challenging and simplification pressure.
+- **Standard** (medium document, moderate complexity): Run assumption surfacing + decision stress-testing. Produce findings proportional to the document's decision density. Other personas cover premise challenging and simplification pressure -- focus on your unique contributions.
 - **Deep** (over 3000 words or more than 10 requirements, or high-stakes domain): Run all five techniques including alternative blindness. Run multiple passes over major decisions. Trace assumption chains across sections.
 
 ## Analysis protocol
