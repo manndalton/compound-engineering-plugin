@@ -166,6 +166,7 @@ Launch these subagents IN PARALLEL. Each returns text data to the orchestrator.
        - Files and Components Touched: blast radius across sessions
        - Cross-Session Patterns: observations that only emerge across sessions
        ```
+   - Omit the `mode` parameter so the user's configured permission settings apply
    - Returns: structured digest of findings from prior sessions, or "no relevant prior sessions" if none found
 
 </parallel_tasks>
