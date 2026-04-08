@@ -39,8 +39,7 @@ Infer the time range from the request and map it to a scan window. **Start narro
 | Signal | Scan window | Codex directory strategy |
 |--------|-------------|--------------------------|
 | "today", "this morning" | 1 day | Current date dir only |
-| No time signal (default) | 5 days | Last 5 date dirs |
-| "last few days", "this week", "recently" | 7 days | Last 7 date dirs |
+| "recently", "last few days", "this week", or no time signal (default) | 7 days | Last 7 date dirs |
 | "last few weeks", "this month" | 30 days | Last 30 date dirs |
 | "last few months", broad feature history | 90 days | Last 90 date dirs |
 
@@ -142,7 +141,7 @@ Correlate sessions to the current problem using these signals (in priority order
 
 **Exclude the current session** -- its conversation history is already available to the caller.
 
-**Drop sessions outside the scan window before selecting.** Use the `ts` (or `last_ts`) field from metadata extraction and discard any session whose timestamp falls outside the window. Do not carry forward old sessions just because they exist — a 20-day-old session is irrelevant to a "last few days" query regardless of how relevant its branch looks.
+**Drop sessions outside the scan window before selecting.** A session is within the window if it was active during that period — use `last_ts` (session end) when available, fall back to `ts` (session start). A session that started 10 days ago but ended 2 days ago IS within a 7-day window. Discard sessions where both `ts` and `last_ts` fall before the window start. Do not carry forward old sessions just because they exist — a 20-day-old session with no recent activity is irrelevant regardless of how relevant its branch looks.
 
 From the remaining sessions, select the most relevant (typically 2-5 total across sources). Prefer sessions that are:
 - Strongly correlated (same branch or same CWD)
