@@ -34,10 +34,18 @@ running in Claude Code — tell the user this skill only works in Claude Code an
 
 ### 1. Platform gate
 
-If any pre-resolved value above contains `__CE_UPDATE_`, `CLAUDE_PLUGIN_ROOT`, or is
-empty: tell the user this skill requires Claude Code and stop. No further action.
+If **Plugin root path** contains `__CE_UPDATE_ROOT_FAILED__`, a literal
+`${CLAUDE_PLUGIN_ROOT}` string, or is empty: tell the user this skill requires Claude Code
+and stop. No further action.
 
 ### 2. Compare versions
+
+If **Latest released version** contains `__CE_UPDATE_VERSION_FAILED__`: tell the user the
+latest release could not be fetched (gh may be unavailable or rate-limited) and stop.
+
+If **Cached version folder(s)** contains `__CE_UPDATE_CACHE_FAILED__`: no marketplace cache
+exists. Tell the user: "No marketplace cache found — this appears to be a local dev checkout
+or fresh install." and stop.
 
 Take the **latest released version** and the **cached folder list**.
 
