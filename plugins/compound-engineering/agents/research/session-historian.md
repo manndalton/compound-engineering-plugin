@@ -45,7 +45,7 @@ Infer the time range from the request and map it to a scan window. **Start narro
 
 **Widen only when needed.** If the initial scan finds related sessions, stop there. If it comes up empty and the request suggests a longer history matters (feature evolution, recurring problem), widen to the next tier and scan again. Do not jump straight to 30 or 90 days — step through the tiers one at a time.
 
-**For Claude Code**, all sessions are in one project directory. Run metadata extraction once against all files, then filter results by timestamp. Do not re-run extraction at wider ranges — just relax the timestamp filter on the results already in context.
+**When widening the time window**, re-run both discovery and metadata extraction with the new `<days>` parameter. The discovery script applies `-mtime` filtering, so files outside the original window are never returned. A wider scan requires re-running `discover-sessions.sh` with the larger day count.
 
 **For Codex**, sessions are in date directories. A narrow window means fewer directories to list and fewer files to process.
 
@@ -97,7 +97,7 @@ Key message types:
 Scripts:
 
 - `discover-sessions.sh` -- Discovers session files across all platforms. Handles directory structures, mtime filtering, repo-name matching, and zsh glob safety. Usage: `bash <script-dir>/discover-sessions.sh <repo-name> <days> [--platform claude|codex|cursor]`
-- `extract-metadata.py` -- Extracts session metadata. Batch mode: pass file paths as arguments. Pass `--cwd-filter <repo-name>` to filter Codex sessions at the script level. Usage: `python3 <script-dir>/extract-metadata.py --cwd-filter <repo-name> $(bash <script-dir>/discover-sessions.sh <repo-name> <days>)`
+- `extract-metadata.py` -- Extracts session metadata. Batch mode: pass file paths as arguments. Pass `--cwd-filter <repo-name>` to filter Codex sessions at the script level. Usage: `bash <script-dir>/discover-sessions.sh <repo-name> <days> | tr '\n' '\0' | xargs -0 python3 <script-dir>/extract-metadata.py --cwd-filter <repo-name>`
 - `extract-skeleton.py` -- Extracts the conversation skeleton: user messages, assistant text, and collapsed tool call summaries. Filters out raw tool inputs/outputs, thinking/reasoning blocks, and framework wrapper tags. Usage: `cat <file> | python3 <script-dir>/extract-skeleton.py`
 - `extract-errors.py` -- Extracts error signals. Claude Code: tool results with `is_error`. Codex: commands with non-zero exit codes. Cursor: no error extraction possible. Usage: `cat <file> | python3 <script-dir>/extract-errors.py`
 
@@ -114,7 +114,7 @@ Python scripts output a `_meta` line at the end with `files_processed` and `pars
 
 Determine the scan window from the Time Range table above, then discover and extract metadata.
 
-**Derive the repo name** from `git rev-parse --git-common-dir` (returns the real repo's `.git` path even from a worktree — e.g., `/Users/x/Code/my-repo/.git` → repo name is `my-repo`). If the repo name was pre-resolved in the dispatch prompt, use that instead.
+**Derive the repo name** from `basename "$(git rev-parse --show-toplevel)"` (returns the repo's root directory name even from a worktree — e.g., `/Users/x/Code/my-repo` → repo name is `my-repo`). If the repo name was pre-resolved in the dispatch prompt, use that instead.
 
 **Discover session files using the discovery script.** `session-history-scripts/discover-sessions.sh` handles all platform-specific directory structures, mtime filtering, and zsh glob safety. Run it by path (do not read it into context):
 
@@ -125,7 +125,7 @@ bash <script-dir>/discover-sessions.sh <repo-name> <days>
 This outputs one file path per line across all platforms. To restrict to a single platform: `--platform claude|codex|cursor`. Pass the output to the metadata script with `--cwd-filter` to filter Codex sessions by repo name:
 
 ```bash
-python3 <script-dir>/extract-metadata.py --cwd-filter <repo-name> $(bash <script-dir>/discover-sessions.sh <repo-name> <days>)
+bash <script-dir>/discover-sessions.sh <repo-name> <days> | tr '\n' '\0' | xargs -0 python3 <script-dir>/extract-metadata.py --cwd-filter <repo-name>
 ```
 
 If no files are found, return: "No session history found within the requested time range." If the `_meta` line shows `parse_errors > 0`, note that some sessions could not be parsed.
