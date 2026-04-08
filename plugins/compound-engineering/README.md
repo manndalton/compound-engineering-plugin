@@ -47,6 +47,7 @@ The primary entry points for engineering work, invoked as slash commands:
 | `/test-browser` | Run browser tests on PR-affected pages |
 | `/test-xcode` | Build and test iOS apps on simulator using XcodeBuildMCP |
 | `/onboarding` | Generate `ONBOARDING.md` to help new contributors understand the codebase |
+| `/ce-update` | Check compound-engineering plugin version and fix stale cache (Claude Code only) |
 | `/todo-resolve` | Resolve todos in parallel |
 | `/todo-triage` | Triage and prioritize pending todos |
 

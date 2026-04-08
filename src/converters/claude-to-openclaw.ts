@@ -1,11 +1,12 @@
 import { formatFrontmatter } from "../utils/frontmatter"
 import { normalizeModelWithProvider } from "../utils/model"
 import { sanitizePathName } from "../utils/files"
-import type {
-  ClaudeAgent,
-  ClaudeCommand,
-  ClaudePlugin,
-  ClaudeMcpServer,
+import {
+  type ClaudeAgent,
+  type ClaudeCommand,
+  type ClaudePlugin,
+  type ClaudeMcpServer,
+  filterSkillsByPlatform,
 } from "../types/claude"
 import type {
   OpenClawBundle,
@@ -29,7 +30,8 @@ export function convertClaudeToOpenClaw(
 
   const skills: OpenClawSkillFile[] = [...agentSkills, ...commandSkills]
 
-  const skillDirCopies = plugin.skills.map((skill) => ({
+  const platformSkills = filterSkillsByPlatform(plugin.skills, "openclaw")
+  const skillDirCopies = platformSkills.map((skill) => ({
     sourceDir: skill.sourceDir,
     name: skill.name,
   }))
@@ -37,7 +39,7 @@ export function convertClaudeToOpenClaw(
   const allSkillDirs = [
     ...agentSkills.map((s) => sanitizePathName(s.dir)),
     ...commandSkills.map((s) => sanitizePathName(s.dir)),
-    ...plugin.skills.map((s) => sanitizePathName(s.name)),
+    ...platformSkills.map((s) => sanitizePathName(s.name)),
   ]
 
   const manifest = buildManifest(plugin, allSkillDirs)
