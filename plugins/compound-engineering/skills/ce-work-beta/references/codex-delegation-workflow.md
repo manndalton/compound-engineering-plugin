@@ -293,7 +293,7 @@ Do NOT use bare `git clean -fd` without path arguments.
 **Commit on success:**
 
 ```bash
-git add <files from result's files_modified>
+git add $(git diff --name-only HEAD)
 git commit -m "feat(<scope>): <batch summary>"
 ```
 
