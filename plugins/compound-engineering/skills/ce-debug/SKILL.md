@@ -38,7 +38,7 @@ All phases self-size — a simple bug flows through them in seconds, a complex b
 Parse the input and reach a clear problem statement.
 
 **If the input references an issue tracker**, fetch it:
-- GitHub (`#123`, `org/repo#123`, github.com URL): `gh issue view $ISSUE --json title,body,comments,labels`
+- GitHub (`#123`, `org/repo#123`, github.com URL): Parse the issue reference from `<bug_description>` and fetch with `gh issue view <number> --json title,body,comments,labels`. For URLs, pass the URL directly to `gh`.
 - Other trackers (Linear URL/ID, Jira URL/key, any tracker URL): Attempt to fetch using available MCP tools or by fetching the URL content. If the fetch fails — auth, missing tool, non-public page — ask the user to paste the relevant issue content.
 
 Extract reported symptoms, expected behavior, reproduction steps, and environment details. Then proceed to Phase 1.
