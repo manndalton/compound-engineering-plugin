@@ -508,9 +508,7 @@ deepened: YYYY-MM-DD  # optional, set when the confidence check substantively st
      the implementer may adjust the structure if implementation reveals a better layout. -->
 ## Output Structure
 
-```
-[directory tree showing new directories and files]
-```
+    [directory tree showing new directories and files]
 
 <!-- Optional: Include this section only when the work involves DSL design, multi-component
      integration, complex data flow, state-heavy lifecycle, or other cases where prose alone
