@@ -1,35 +1,10 @@
 # Upload and Approval
 
-Get user approval for the local artifact, upload evidence to a public URL, and generate markdown for PR inclusion.
+Upload evidence to a public URL, get user approval, and return structured output for PR inclusion.
 
-## Step 1: Local Approval Gate
+## Step 1: Upload to catbox.moe
 
-Before uploading anywhere public, open the artifact so the user can review it, then ask for approval.
-
-**Open the file** using the platform file-opener before presenting the question:
-
-```bash
-open [RUN_DIR]/[artifact]
-```
-
-(`open` on macOS, `xdg-open` on Linux. Skip if running headless/in CI.)
-
-Then present the approval question via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini).
-
-**Question:** "Evidence captured (`[artifact filename only]`). Review the file that just opened and decide:"
-
-Show only the artifact filename (e.g., `demo.gif`), not the full temp directory path.
-
-**Options:**
-1. **Looks good, upload for PR** -- proceed to upload
-2. **Not good enough, try again** -- return to the tier execution step and re-capture
-3. **Skip evidence for this PR** -- set evidence to null and proceed
-
-If the question tool is unavailable (headless/background mode), present the numbered options and wait for the user's reply before proceeding.
-
-## Step 2: Upload to catbox.moe
-
-After the user approves the local artifact, upload the evidence file (GIF or PNG) using the capture pipeline script. Set `ARTIFACT_PATH` to the approved GIF or PNG path:
+Upload the evidence file (GIF or PNG) immediately after the tier produces it. Set `ARTIFACT_PATH` to the GIF or PNG path:
 
 ```bash
 python3 scripts/capture-demo.py upload [ARTIFACT_PATH]
@@ -37,9 +12,22 @@ python3 scripts/capture-demo.py upload [ARTIFACT_PATH]
 
 The script uploads to catbox.moe, validates the response starts with `https://`, and retries once on failure. The last line of output is the public URL (e.g., `https://files.catbox.moe/abc123.gif`).
 
-**If upload fails** after retry, report the failure and the local artifact path. Do not commit evidence files to the repo — they are ephemeral artifacts, not source material. Tell the user: "Upload failed. Local artifact preserved at [ARTIFACT_PATH]. You can upload it manually or retry later."
-
 For multiple files (static screenshots tier), upload each file separately.
+
+**If upload fails** after retry, fall back to opening the local file with the platform file-opener (`open` on macOS, `xdg-open` on Linux) so the user can still review it. Include the local path in the approval question instead of a URL.
+
+## Step 2: Approval Gate
+
+Present the uploaded URL to the user for approval. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini).
+
+**Question:** "Evidence uploaded: [CATBOX_URL]"
+
+**Options:**
+1. **Use this in the PR** -- proceed with this URL
+2. **Recapture** -- return to the tier execution step; the user should provide instructions on what to change
+3. **Proceed without evidence** -- set evidence to null and proceed
+
+If the question tool is unavailable (headless/background mode), present the numbered options and wait for the user's reply before proceeding.
 
 ## Step 3: Return Output
 
@@ -49,4 +37,4 @@ Return the structured output defined in the SKILL.md Output section: `Tier`, `De
 
 Remove the `[RUN_DIR]` scratch directory and all temporary files. Preserve nothing -- the evidence lives at the public URL now.
 
-If the upload failed and the user has not yet manually uploaded, preserve `[RUN_DIR]` so the artifact is still accessible.
+If the upload failed and the user chose to proceed without evidence, clean up the scratch directory. If the user wants to retry the upload manually, preserve `[RUN_DIR]` so the artifact is still accessible.
