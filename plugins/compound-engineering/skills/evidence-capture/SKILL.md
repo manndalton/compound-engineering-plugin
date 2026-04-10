@@ -53,7 +53,13 @@ Use the workspace where the feature was built. Do not reinstall from scratch. If
 
 ## Step 2: Detect Project Type
 
-Read `references/project-detection.md` and run the detection logic. Store the result as one of: `web-app`, `cli-tool`, `library`, `desktop-app`, `text-only`.
+Run the detection script:
+
+```bash
+python3 scripts/capture-evidence.py detect
+```
+
+This outputs JSON with `type` and `reason`. Store the `type` value (`web-app`, `cli-tool`, `library`, `desktop-app`, or `text-only`).
 
 ## Step 3: Assess Change Type
 
@@ -80,72 +86,39 @@ Infer feat vs fix from commit messages, branch name, or plan file frontmatter (`
 
 ## Step 4: Tool Preflight
 
-Check which capture tools are available. Run each check independently:
+Run the preflight check:
 
 ```bash
-command -v agent-browser
+python3 scripts/capture-evidence.py preflight
 ```
 
-```bash
-command -v vhs
-```
-
-```bash
-command -v silicon
-```
-
-```bash
-command -v ffmpeg
-```
-
-Print a preflight summary:
-
-```
-Evidence capture -- tool preflight:
-  agent-browser: [installed/missing]  (browser reel, static screenshots)
-  vhs:           [installed/missing]  (terminal recording) -- install: brew install charmbracelet/tap/vhs
-  silicon:       [installed/missing]  (screenshot reel) -- install: brew install silicon
-  ffmpeg:        [installed/missing]  (GIF stitching, frame normalization) -- install: brew install ffmpeg
-```
-
-ffmpeg (with ffprobe) handles both GIF stitching and frame dimension normalization. No additional dependencies are needed for the pipeline — `scripts/capture-evidence.sh` wraps the multi-step ffmpeg workflow into single commands.
+This outputs JSON with boolean availability for each tool: `agent_browser`, `vhs`, `silicon`, `ffmpeg`, `ffprobe`. Print a human-readable summary for the user based on the result, noting install commands for missing tools (e.g., `brew install charmbracelet/tap/vhs` for vhs, `brew install silicon` for silicon, `brew install ffmpeg` for ffmpeg).
 
 ## Step 5: Create Run Directory
 
-Create a per-run scratch directory before writing any files:
+Create a per-run scratch directory in the OS temp location:
 
 ```bash
-mkdir -p .context/compound-engineering/evidence-capture
+mktemp -d -t evidence-capture-XXXXXX
 ```
 
-```bash
-mktemp -d .context/compound-engineering/evidence-capture/run-XXXXXX
-```
-
-Use the output as `RUN_DIR`. Pass this concrete run directory to every tier reference.
+Use the output as `RUN_DIR`. Pass this concrete run directory to every tier reference. Evidence artifacts are ephemeral — they get uploaded to a public URL and then discarded. The OS temp directory is the right place for them, not the repo tree.
 
 ## Step 6: Recommend Tier and Ask User
 
-Map project type, change classification, and available tools to a tier recommendation:
+Run the recommendation script with the project type from Step 2, change classification from Step 3, and preflight JSON from Step 4:
 
-| Project Type | Change Type | Tools Available | Recommended Tier |
-|---|---|---|---|
-| web-app | motion/states | agent-browser + ffmpeg | **Browser reel** |
-| web-app | motion/states | agent-browser only | **Static screenshots** |
-| cli-tool | motion | vhs | **Terminal recording** |
-| cli-tool | motion | silicon + ffmpeg (no vhs) | **Screenshot reel** |
-| cli-tool | states | silicon + ffmpeg | **Screenshot reel** |
-| cli-tool | states | vhs (no silicon) | **Terminal recording** |
-| cli-tool | (any) | none of above | **Static screenshots** |
-| desktop-app | motion/states | agent-browser + ffmpeg | **Browser reel** (via localhost/CDP) |
-| desktop-app | motion/states | no agent-browser | **Static screenshots** |
-| library | (any) | (any) | **Static screenshots** |
+```bash
+python3 scripts/capture-evidence.py recommend --project-type [TYPE] --change-type [motion|states] --tools '[PREFLIGHT_JSON]'
+```
 
-Present options to the user via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). Show only tiers whose required tools passed preflight. Mark the recommended tier.
+This outputs JSON with `recommended` (the best tier), `available` (list of tiers whose tools are present), and `reasoning`.
+
+Present the available tiers to the user via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). Mark the recommended tier. Always include "No evidence needed" as a final option.
 
 **Question:** "How should evidence be captured for this change?"
 
-**Options** (show only where tools are available, order by recommendation):
+**Options** (show only tiers from the `available` list, order by recommendation):
 1. **Browser reel** -- Agent-browser screenshots stitched into animated GIF. Best for web apps.
 2. **Terminal recording** -- VHS terminal recording to GIF. Best for CLI tools with interaction/motion.
 3. **Screenshot reel** -- Styled terminal frames stitched into animated GIF. Best for discrete CLI steps.

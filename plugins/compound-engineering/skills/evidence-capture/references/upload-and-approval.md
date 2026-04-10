@@ -20,20 +20,12 @@ If the question tool is unavailable (headless/background mode), present the numb
 After the user approves the local artifact, upload the evidence file (GIF or PNG) using the capture pipeline script. Set `ARTIFACT_PATH` to the approved GIF or PNG path:
 
 ```bash
-bash scripts/capture-evidence.sh upload [ARTIFACT_PATH]
+python3 scripts/capture-evidence.py upload [ARTIFACT_PATH]
 ```
 
 The script uploads to catbox.moe, validates the response starts with `https://`, and retries once on failure. The last line of output is the public URL (e.g., `https://files.catbox.moe/abc123.gif`).
 
-**If upload fails** after retry, fall back to committing evidence to the PR branch:
-```bash
-mkdir -p docs/evidence
-cp [ARTIFACT_PATH] docs/evidence/[ARTIFACT_FILE_NAME]
-git add docs/evidence/[ARTIFACT_FILE_NAME]
-git commit -m "Add evidence for PR"
-git push
-```
-Use the relative path `docs/evidence/[ARTIFACT_FILE_NAME]` as the image URL in the PR description. GitHub renders images committed to the branch once pushed.
+**If upload fails** after retry, report the failure and the local artifact path. Do not commit evidence files to the repo — they are ephemeral artifacts, not source material. Tell the user: "Upload failed. Local artifact preserved at [ARTIFACT_PATH]. You can upload it manually or retry later."
 
 For multiple files (static screenshots tier), upload each file separately.
 
@@ -63,4 +55,4 @@ Return empty string. No section added to PR.
 
 Remove the `[RUN_DIR]` scratch directory and all temporary files. Preserve nothing -- the evidence lives at the public URL now.
 
-If evidence was committed to the branch (catbox fallback), do not delete the committed files.
+If the upload failed and the user has not yet manually uploaded, preserve `[RUN_DIR]` so the artifact is still accessible.

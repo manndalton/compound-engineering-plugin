@@ -33,27 +33,26 @@ All checks passed
 - 3-5 frames is ideal -- enough to tell the story, not so many the GIF is huge
 - Strip unicode characters that silicon's default font can't render (checkmarks, fancy arrows)
 
-## Step 2: Render Each Frame
+## Step 2: Split into Frame Files
 
-For each frame (split on `---` lines), write to a temporary text file and render through silicon:
+Split the demo content on `---` lines into separate text files, one per frame:
+
+- `[RUN_DIR]/frame-001.txt`
+- `[RUN_DIR]/frame-002.txt`
+- `[RUN_DIR]/frame-003.txt`
+- etc.
+
+## Step 3: Render and Stitch
+
+Use the capture pipeline script to render each text frame through silicon and stitch into an animated GIF in a single call:
 
 ```bash
-silicon [RUN_DIR]/frame-001.txt -o [RUN_DIR]/frame-001.png --theme Dracula -l bash --pad-horiz 20 --pad-vert 20
+python3 scripts/capture-evidence.py screenshot-reel --output [RUN_DIR]/demo.gif --duration 2.5 --text [RUN_DIR]/frame-001.txt [RUN_DIR]/frame-002.txt [RUN_DIR]/frame-003.txt
 ```
 
-Repeat for each frame, numbering sequentially (frame-001, frame-002, etc.).
+The script handles silicon rendering, dimension normalization, two-pass palette generation, and automatic frame reduction if the GIF exceeds limits. Default duration is 2.5 seconds per frame (faster than browser reels since terminal frames are quicker to read).
 
-## Step 3: Stitch into GIF
-
-Use the capture pipeline script to normalize frame dimensions, stitch with two-pass palette, and auto-reduce if over 10 MB. Screenshot reels use 2.5 seconds per frame (less than browser reels since terminal frames are faster to read):
-
-```bash
-bash scripts/capture-evidence.sh stitch --duration 2.5 [RUN_DIR]/demo.gif [RUN_DIR]/frame-*.png
-```
-
-The script handles dimension normalization (silicon produces different widths based on content length), palette generation, and automatic frame reduction if the GIF exceeds limits.
-
-**If silicon or ffmpeg fails** (rendering error, stitching error, empty output): fall back to static screenshots tier. Include the raw terminal output as a code block in the PR description instead. Label as "Terminal output", not "Screenshots".
+**If the script fails** (silicon rendering error, stitching error, empty output): fall back to static screenshots tier. Include the raw terminal output as a code block in the PR description instead. Label as "Terminal output", not "Screenshots".
 
 ## Step 4: Cleanup
 

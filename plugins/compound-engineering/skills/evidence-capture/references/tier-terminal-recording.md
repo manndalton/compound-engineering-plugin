@@ -64,23 +64,15 @@ Sleep 2s
 
 ## Step 3: Run VHS
 
-```bash
-vhs [RUN_DIR]/demo.tape
-```
-
-VHS produces the GIF directly at the path specified in the `Output` directive.
-
-## Step 4: Size Check
+Use the capture pipeline script to execute the tape file and validate output:
 
 ```bash
-ls -la [RUN_DIR]/demo.gif
+python3 scripts/capture-evidence.py terminal-recording --output [RUN_DIR]/demo.gif --tape [RUN_DIR]/demo.tape
 ```
 
-- **Under 5 MB:** Ideal. Proceed to upload.
-- **5-10 MB:** Acceptable. Proceed.
-- **Over 10 MB:** Reduce by adjusting the .tape: smaller terminal dimensions (`Set Width/Height`), shorter recording (fewer sleeps), or lower font size. Re-run VHS.
+The script runs VHS, validates the output exists, and reports the file size. If the GIF exceeds 10 MB, reduce by adjusting the .tape: smaller terminal dimensions (`Set Width/Height`), shorter recording (fewer sleeps), or lower font size. Re-run.
 
-## Step 5: Quality Check
+## Step 4: Quality Check
 
 Read the generated GIF to verify:
 
