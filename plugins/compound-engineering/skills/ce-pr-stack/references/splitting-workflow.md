@@ -1,10 +1,12 @@
 # Splitting Workflow
 
-Decompose a feature branch into a chain of stacked PR layers using `gh stack`. This reference is loaded by `SKILL.md` when split-mode work has cleared the basic state gate and, for auto-invoked entries, the effectiveness gate.
+Decompose a feature branch into a chain of stacked PR layers locally using `gh stack`. This reference is loaded by `SKILL.md` when split-mode work has cleared the basic state gate and, for auto-invoked entries, the effectiveness gate.
+
+This workflow **only decomposes** a branch into a local stack. It does not push, does not submit PRs, and does not write PR descriptions. Shipping the stack is owned by the `git-commit-push-pr` skill, which is stack-aware and routes to its stack-aware path when it detects a stack branch.
 
 Use the platform's blocking question tool whenever this workflow says "ask the user" (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If none is available, present numbered options and wait for the user's reply before continuing.
 
-When the workflow has multiple sequential steps, track them with the platform's task-tracking tool (`TaskCreate` / `TaskUpdate` / `TaskList` in Claude Code, `update_plan` in Codex). One task per phase is a reasonable default; add sub-tasks for the per-layer loop in Phase 3.
+When the workflow has multiple sequential steps, track them with the platform's task-tracking tool (`TaskCreate` / `TaskUpdate` / `TaskList` in Claude Code, `update_plan` in Codex). Create one task per phase; add sub-tasks for the per-layer loop in Phase 3.
 
 ---
 
@@ -12,14 +14,13 @@ When the workflow has multiple sequential steps, track them with the platform's 
 
 Before invoking any `gh stack <cmd>`, run `gh stack <cmd> --help` first to verify current flags and behavior. gh-stack is in GitHub's private preview; flags and output formats may evolve between versions.
 
-This reference file invokes the following subcommands — verify each before first use in the session:
+This workflow invokes only the following subcommands — verify each before first use in the session:
 
 - `gh stack init` — create the first layer (or adopt the current branch as the first layer)
 - `gh stack add` — add a branch on top of the current stack tip
-- `gh stack push` — push all stack branches to the remote
-- `gh stack submit` — create (or update) PRs for the stack on GitHub
-- `gh stack rebase` — cascading rebase across the stack, for mid-construction layer adjustment
-- `gh stack unstack` — teardown; used only in rollback
+- `gh stack unstack --local` — teardown; used only in rollback
+
+Ship commands (`gh stack push`, `gh stack submit`) are **not** invoked from this workflow. They belong to `git-commit-push-pr`, which runs after handoff.
 
 Treat any command-shape assumption in this file as a routing hint, not a contract. If `--help` output disagrees with the invocation below, follow the `--help` output.
 
@@ -64,7 +65,13 @@ Signals that a commit starts a new layer:
 - The commit message changes register (e.g., from "wire up API" to "polish UI").
 - The commit is a standalone refactor or rename that makes sense to ship on its own.
 
-**V2 — semantic diff analysis (deferred, future work):** Instead of respecting commit boundaries, the model would group hunks by concern (data model, API, UI, infrastructure) regardless of which commit introduced them. This enables cleaner layers when the developer's commit history is noisy, but requires partial-file decomposition (hunk staging) which V1 does not do. Do not attempt V2 in this version.
+### Plan-informed variant
+
+If the skill was invoked with `--plan <path>`, read the plan document before grouping commits. Use the plan's implementation-unit boundaries as the **primary** signal for candidate layers, and use commit boundaries as a **secondary cross-check** — do the commit groupings line up with the plan's units? Where they diverge, prefer the plan's structure but surface the divergence in the Phase 2 proposal so the user can adjust.
+
+### V2 — semantic diff analysis (deferred, future work)
+
+Instead of respecting commit boundaries, the model would group hunks by concern (data model, API, UI, infrastructure) regardless of which commit introduced them. This enables cleaner layers when the developer's commit history is noisy, but requires partial-file decomposition (hunk staging) which V1 does not do. Do not attempt V2 in this version.
 
 ### Early exit — single concern
 
@@ -78,7 +85,7 @@ If the user agrees, stop this workflow and defer to `git-commit-push-pr`. Do not
 
 ## Phase 2 — Propose layers (mandatory approval gate)
 
-Present the split plan to the user. This is a **mandatory gate for all invocation modes** — manual, delegated, and auto-invoked. The effectiveness gate in `SKILL.md` Step 5 only runs for auto-invoked entries, but the layer-proposal gate here always runs because the agent's proposed split is a guess until the user confirms.
+Present the split plan to the user. This is a **mandatory gate for all invocation modes** — manual, delegated, and auto-invoked. The effectiveness gate in `SKILL.md` Step 5 only runs for auto-invoked entries; the layer-proposal gate here always runs because the agent's proposed split is a guess until the user confirms.
 
 For each proposed layer, include:
 
@@ -107,13 +114,13 @@ Common adjustments to expect:
 Each file belongs to exactly one layer. When a file's changes span concerns:
 
 1. Assign the file to the layer where its **primary** changes belong (the concern that accounts for most of the edits, or the concern that cannot be delivered without this file).
-2. Note the cross-cutting nature in that layer's PR description (Phase 4), so reviewers know to expect tangential hunks.
+2. Note the cross-cutting nature on the layer so it can be surfaced later — `git-commit-push-pr` invokes `ce-pr-description` per PR after handoff, and that per-layer note is the signal reviewers will see in the resulting PR description.
 
 Per-hunk staging (splitting a single file across multiple layers) is deferred to V2. If a file genuinely cannot be assigned to a single layer without producing broken intermediate states, surface that to the user and ask whether to combine the affected layers or accept the cross-cutting note.
 
 ---
 
-## Phase 3 — Create the stack (local only; do NOT push yet)
+## Phase 3 — Create the stack locally
 
 **Rollback protocol — record state before any mutation.** Before creating any branches, capture the original branch name and HEAD SHA:
 
@@ -122,9 +129,9 @@ git rev-parse --abbrev-ref HEAD
 git rev-parse HEAD
 ```
 
-Persist these values for the duration of the workflow. If anything fails before Phase 4, these anchor the rollback.
+Persist these values for the duration of the workflow. If anything fails before handoff, these anchor the rollback.
 
-**Guiding principle:** complete ALL local branch construction AND verify each layer's basic checks BEFORE running any `gh stack push` / `gh stack submit`. Separating local construction from remote submission bounds the blast radius of a failure to local state — nothing reaches GitHub until the full stack has been validated locally.
+**Guiding principle:** complete ALL local branch construction AND verify each layer's basic checks BEFORE handing off to `git-commit-push-pr`. Nothing in this phase touches the remote. That bounds the blast radius of any failure to local state — the remote stays clean until after handoff.
 
 ### Per-layer loop
 
@@ -166,9 +173,9 @@ For each approved layer, from bottom (closest to the base branch) to top:
 
 4. **Simplify and refactor within this layer's scope.**
 
-   While constructing the layer, clean up code within the layer's scope — remove dead imports introduced by the original commits, tighten interfaces now that the layer's concern is isolated, improve naming that the layer makes newly coherent. This is a core value of stacked review: each layer is a natural opportunity for small quality improvements that would have been noise in the original monolithic branch. Keep refactors scoped to files already in this layer; a refactor that pulls in new files belongs in its own layer (or was mis-scoped in Phase 2 — surface that to the user).
+   While constructing the layer, clean up code within the layer's scope — remove dead imports introduced by the original commits, tighten interfaces now that the layer's concern is isolated, improve naming that the layer makes newly coherent. This is a core value of stacked review: each layer is a natural opportunity for small quality improvements that would have been noise in the original monolithic branch.
 
-   Amend or follow-up-commit the refactor onto the layer. Do not let refactor work leak across layer boundaries.
+   **Constraint:** refactors stay within the current layer's file set. A refactor that pulls in files from another layer is a signal that the layer boundary was wrong — surface that to the user rather than quietly expanding the layer. Amend or follow-up-commit the refactor onto the layer. Do not let refactor work leak across layer boundaries.
 
 5. **Verify the layer builds and basic checks pass.**
 
@@ -179,11 +186,11 @@ For each approved layer, from bottom (closest to the base branch) to top:
    - **Adjust layer boundaries.** A failing intermediate layer usually means the boundary is wrong — a file or change belonging to an earlier layer ended up in a later one (or vice versa). Return to Phase 2 with the failure context and revise the proposal.
    - **Roll back.** Execute the rollback protocol (see below) and stop.
 
-   Do not push a broken layer.
+   Do not hand off a broken layer.
 
 6. **Repeat for the next layer** until the full stack is built locally.
 
-Once the loop completes and every layer has passed its checks, proceed to Phase 4.
+Once the loop completes and every layer has passed its checks, proceed to the handoff.
 
 ### Rollback protocol (invoke on any Phase 3 failure)
 
@@ -193,14 +200,14 @@ When Phase 3 fails partway through, restore the user to their pre-workflow state
 2. **Provide exact cleanup commands.** Typical recovery:
 
    ```bash
+   # Tear down the local stack tracking (keeps nothing on GitHub — push never ran)
+   gh stack unstack --local
+
    # Return to the original branch
    git checkout <original-branch>
 
    # Delete the layer branches that were created (repeat per layer)
    git branch -D <layer-1-branch> <layer-2-branch> ...
-
-   # If `gh stack init` ran, tear down the local stack tracking
-   gh stack unstack --local
    ```
 
    Include `--local` on `gh stack unstack` so nothing reaches GitHub. Run `gh stack unstack --help` first to confirm the flag.
@@ -209,64 +216,23 @@ When Phase 3 fails partway through, restore the user to their pre-workflow state
    - **Abort** — run the cleanup commands above, restore the original branch at the original HEAD SHA, and stop the workflow.
    - **Adjust and retry** — return to Phase 2 with the failure context so the user can revise layer boundaries, then re-enter Phase 3.
 
-Because Phase 3 is entirely local, rollback never has to touch GitHub. That is the whole point of separating local construction from remote submission.
+Because this workflow is entirely local — push and submit happen only after handoff — rollback never has to touch GitHub. Failures during decomposition are bounded to local state. That is the key property of separating decomposition from shipping.
 
 ---
 
-## Phase 4 — Submit
+## Handoff to `git-commit-push-pr`
 
-Once every layer in Phase 3 passed its checks locally:
+This is a single step, not a phase. When Phase 3 completes and every layer has passed its local checks:
 
-1. **Push the stack to the remote.**
+1. **Announce the handoff** to the user, for example:
 
-   ```bash
-   gh stack push
-   ```
+   > Stack constructed locally. Handing off to `git-commit-push-pr` to ship.
 
-   Run `gh stack push --help` first to confirm flag shape. The installed extension supports `--remote <name>` when the auto-detected remote is wrong (e.g., fork-based workflows). `gh stack push` pushes every branch in the stack.
+2. **Load the `git-commit-push-pr` skill semantically.** Do not invoke it as a slash command; the skill is loaded by name.
 
-2. **Create the PRs.**
+3. `git-commit-push-pr` detects that the current branch is part of a stack and routes to its stack-aware ship path. That path owns `gh stack push`, `gh stack submit --draft --auto`, per-PR description generation via `ce-pr-description`, and `gh pr edit` to apply each description to its PR. None of those responsibilities live in this workflow.
 
-   ```bash
-   gh stack submit
-   ```
-
-   Run `gh stack submit --help` first. Useful flags on the installed extension:
-
-   - `--draft` — create PRs as drafts. Offer this to the user if the work is not ready for review.
-   - `--auto` — use auto-generated titles without prompting. Do **not** use `--auto` in this workflow — the per-PR descriptions below are written by the agent, not auto-generated.
-   - `--remote <name>` — mirror the remote used for `push`.
-
-   `gh stack submit` opens (or updates) one PR per layer.
-
-### Per-PR descriptions
-
-Write one description per layer, following the writing principles from the `git-commit-push-pr` skill's Step 6 (describe the PR's net result, not a changelog; evidence when observable behavior applies; avoid cookie-cutter templates). Each layer's description is scoped to that layer's changes only — not the whole stack's ambition.
-
-Minimum elements per layer description:
-
-- **What this layer delivers** — one or two sentences describing the net result of this layer alone.
-- **Why this layer is separable** — a short note on why it makes sense as an independent reviewable unit (independence, sequencing, reviewer divergence, mechanical vs. semantic split).
-- **Dependencies** — which earlier layers in the stack this PR stacks on top of (gh stack submit will typically link these automatically, but restating them in the description helps reviewers).
-- **Cross-cutting notes** — for any file assigned primarily to this layer but with tangential changes (per the V1 constraint in Phase 2), briefly note what else is touched so reviewers are not surprised.
-
-### Top-of-stack PR — include a stack map
-
-On the top-of-stack PR (the last layer), add a short section that lists the full chain so a reviewer landing on any PR in the stack can see the shape of the whole change. Example:
-
-```
-## Stack
-
-1. feat/billing-data-model — schema + migrations
-2. feat/billing-api — service + endpoints (stacks on #1)
-3. feat/billing-ui — customer-facing form and list (stacks on #2) <- this PR
-```
-
-Use `gh stack view` to confirm the branch order before writing the stack map.
-
-### Evidence
-
-If any layer changes observable behavior (UI, CLI output, API behavior), capture evidence for that layer's PR following the same approach `git-commit-push-pr` uses — typically via the `ce-demo-reel` skill, scoped to the layer's changes. Do not lump evidence for the whole stack into the top PR; attach each artifact to the layer that demonstrates it.
+This file does **not** invoke `gh stack push` or `gh stack submit`, and does **not** write PR descriptions. Any per-layer context that downstream description generation needs — cross-cutting file notes, layer summaries, dependency chain — is recorded on the commits themselves (commit subject and body) during Phase 3, which `git-commit-push-pr` will read when it runs.
 
 ---
 
@@ -274,11 +240,12 @@ If any layer changes observable behavior (UI, CLI output, API behavior), capture
 
 These scenarios shape how the workflow should respond in practice. Use them as a mental checklist when the workflow is in an unusual state.
 
-- **Branch with ~30 files across 3 concerns** — Phase 1 groups commits into three layers. Phase 2 proposes them with branch names, file lists, and line counts. The user approves. Phase 3 builds the three branches locally and verifies each. Phase 4 pushes and submits.
+- **Branch with ~30 files across 3 concerns** — Phase 1 groups commits into three layers. Phase 2 proposes them with branch names, file lists, and line counts. The user approves. Phase 3 builds the three branches locally and verifies each. Handoff to `git-commit-push-pr` to ship.
 - **User adjusts the proposal ("combine layers 1 and 2")** — merge the two layers' file sets and commit scope. Re-present the revised two-layer proposal. Proceed once the user approves.
-- **All changes belong to one concern** — exit early in Phase 1. Tell the user a stack would be ceremony; offer to ship as a single PR via `git-commit-push-pr`. Do not force three layers out of one concern.
-- **File appears in multiple proposed layers (partial changes span concerns)** — V1 behavior: assign the file to the layer where its primary changes belong and note the cross-cutting nature in that layer's PR description. If the file genuinely cannot be placed without breaking an intermediate layer, ask the user whether to combine the affected layers or accept the cross-cutting note. (V2 / hunk staging is deferred.)
-- **Test failure on intermediate layer** — stop the Phase 3 loop, report the failing layer and the failure output, offer the user "adjust layer boundaries" or "roll back". Do not push a broken layer.
+- **All changes belong to one concern** — exit early in Phase 1. Tell the user a stack would be ceremony; offer to hand off to `git-commit-push-pr` to ship as a single PR. Do not force three layers out of one concern.
+- **Plan-informed invocation (`--plan <path>`)** — Phase 1 uses plan units as the primary grouping signal, commit boundaries as cross-check. If plan and commits disagree, surface the divergence in the Phase 2 proposal so the user can adjust.
+- **File appears in multiple proposed layers (partial changes span concerns)** — V1 behavior: assign the file to the layer where its primary changes belong and record the cross-cutting note on that layer. If the file genuinely cannot be placed without breaking an intermediate layer, ask the user whether to combine the affected layers or accept the cross-cutting note. (V2 / hunk staging is deferred.)
+- **Test failure on intermediate layer** — stop the Phase 3 loop, report the failing layer and the failure output, offer the user "adjust layer boundaries" or "roll back". Do not hand off a broken stack.
 - **Merge conflict during `git checkout <original-branch> -- <files>`** — stop, report the conflict, offer manual resolution or revisiting the layer boundary that caused it. Do not attempt silent automated resolution.
 
 ---
@@ -287,7 +254,8 @@ These scenarios shape how the workflow should respond in practice. Use them as a
 
 - The layer-proposal gate in Phase 2 is **mandatory for all invocation modes** (manual, delegated, auto-invoked).
 - Record the original branch name and HEAD SHA before any mutation in Phase 3.
-- Complete and verify **all** local branches before running any `gh stack push` / `gh stack submit`.
-- One file per layer in V1. Cross-cutting files go to their primary layer with a note.
+- Complete and verify **all** local branches before handing off to `git-commit-push-pr`.
+- One file per layer in V1. Cross-cutting files go to their primary layer with a note recorded for downstream description generation.
 - Run `gh stack <cmd> --help` before first use of each subcommand in the session.
+- This workflow invokes only `gh stack init`, `gh stack add`, and `gh stack unstack --local`. Push and submit are owned by `git-commit-push-pr`.
 - On any Phase 3 failure, rollback touches only local state — nothing has reached GitHub yet.
