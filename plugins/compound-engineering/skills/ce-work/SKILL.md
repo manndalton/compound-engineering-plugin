@@ -163,7 +163,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
 
    **After all parallel subagents in a batch complete:**
    1. Wait for every subagent in the current parallel batch to finish before acting on any of their results
-   2. For each completed unit, in dependency order: review the diff, run the relevant test suite, stage only that unit's files, and commit with a conventional message derived from the unit's Goal
+   2. For each completed unit, in dependency order: review the diff, run the relevant test suite, stage only that unit's files, and commit with a conventional message derived from the unit's Goal. Note: tests run on the combined working tree containing all units' changes; this is acceptable because the Parallel Safety Check guarantees non-overlapping file sets, so no unit's tests are affected by another unit's edits. Full per-unit isolation via worktrees is tracked in issue #550.
    3. If tests fail after merging a unit's changes, diagnose and fix before committing the next unit
    4. Update the plan checkboxes and task list
    5. Dispatch the next batch of independent units, or the next dependent unit
