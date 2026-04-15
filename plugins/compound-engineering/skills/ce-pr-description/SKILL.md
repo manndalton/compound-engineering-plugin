@@ -68,7 +68,11 @@ If the returned `state` is not `OPEN`, report "PR <number> is <state> (not open)
 - The input form: a bare number or an `owner/repo#NN` shorthand implicitly targets the current repo; a full URL may target any repo.
 - The URL's repo identity: parse the URL's `<owner>/<repo>` path segments and compare against `git remote get-url origin` (strip `.git` suffix, handle `git@github.com:owner/repo` vs `https://github.com/owner/repo` forms).
 
-If the URL-derived repo matches the local `origin` remote's repo, route to Case A. Otherwise route to Case B. For bare-number and shorthand inputs that resolve against the current directory, always Case A. The two cases:
+If the URL-derived repo matches the local `origin` remote's repo, route to Case A. Otherwise route to Case B. For bare-number and shorthand inputs that resolve against the current directory, always Case A.
+
+**Case A fallback to Case B:** Even when the URL-derived repo matches `origin`, the current working directory may not be a usable clone for this PR's refs — for example, the user may be running the skill from a shallow clone, a detached state missing the base branch, or a directory where `git fetch` cannot reach the remote (auth, offline, GHES quirks). If Case A's fetch-and-resolve path fails (the base-ref fetch errors out, or `git merge-base` cannot resolve the merge base after fetch), fall back to Case B rather than failing the skill. Record that the fallback occurred and note it in the caller-facing output as described in Case B. Do not retry Case A.
+
+The two cases:
 
 **Case A — PR is in the current repo** (common case when the user is working inside the target repo):
 
@@ -122,42 +126,51 @@ Also capture the existing PR body for evidence preservation in Step 3 (both case
 
 Resolve both endpoints, **fetching the base ref on demand** before validating. This is important because callers often pass remote-tracking refs (`origin/main`, `origin/develop`) or branch names that may not be present in the local clone — particularly after a fresh clone, after the local branch was deleted, or when targeting a non-default base. The pre-refactor behavior in `git-commit-push-pr` fetched on demand; preserve that here.
 
-Detect whether `<base>` looks like a remote-tracking ref (contains a `/` matching a known remote) or a bare branch name:
+Resolving `<base>` is subtle because a `/` in the name does not reliably indicate a remote prefix — `release/2026-04`, `feat/foo`, and `hotfix/x` are all valid bare branch names that contain `/`. Resolve in this order, and track the "effective base ref" (`EFFECTIVE_BASE`) — the ref that actually resolves locally after any fetch — separately from the user-supplied `<base>`. Use `EFFECTIVE_BASE` in all downstream `git merge-base`, `git log`, and `git diff` calls, because a successful `git fetch origin main` leaves the base at `origin/main`, not `main` (this skill does not check out branches), and validating the bare name after fetch would spuriously fail in clones with no local `main`.
+
+1. **Try `<base>` as-is locally.** If `git rev-parse --verify "<base>"` succeeds, set `EFFECTIVE_BASE=<base>` and skip to validation.
+2. **If `<base>` contains `/` and the prefix is a known remote** (appears in `git remote` output): try `git fetch --no-tags <remote> <branch>`. On success, set `EFFECTIVE_BASE=<base>` (it is already the `<remote>/<branch>` form) and skip to validation. On fetch failure, continue to step 3 — do not exit yet, because the name may also be a valid bare branch with a `/` in it.
+3. **Try `<base>` as a bare branch on each remote.** For `origin` first, then for any remaining remotes, attempt `git fetch --no-tags <remote> <base>`. On the first success, set `EFFECTIVE_BASE=<remote>/<base>` and skip to validation. When only one remote exists, this is equivalent to the single-remote fallback.
+4. **Validate.** Confirm `git rev-parse --verify "$EFFECTIVE_BASE"` and `git rev-parse --verify "<head>"` both succeed. If `EFFECTIVE_BASE` is unset (no step produced a resolving ref), or validation fails, report the invalid-range error and exit.
 
 ```bash
-# If <base> is of the form <remote>/<branch>, try fetching that remote/branch first.
-# If <base> is a bare branch name without a remote prefix, try the default remote (origin
-# first, then the single remote if there's only one) as a fallback.
 BASE=<base>
 HEAD=<head>
+EFFECTIVE_BASE=""
 
-if ! git rev-parse --verify "$BASE" 2>/dev/null >/dev/null; then
-  if [[ "$BASE" == */* ]]; then
-    REMOTE=${BASE%%/*}
-    BRANCH=${BASE#*/}
-    git fetch --no-tags "$REMOTE" "$BRANCH" 2>/dev/null
-  else
-    # Try origin, then single-remote fallback
-    git fetch --no-tags origin "$BASE" 2>/dev/null || {
-      REMOTES=$(git remote)
-      REMOTE_COUNT=$(echo "$REMOTES" | grep -c .)
-      if [ "$REMOTE_COUNT" = "1" ]; then
-        git fetch --no-tags "$REMOTES" "$BASE" 2>/dev/null
-      fi
-    }
+if git rev-parse --verify "$BASE" >/dev/null 2>&1; then
+  EFFECTIVE_BASE="$BASE"
+elif [[ "$BASE" == */* ]] && git remote | grep -qx "${BASE%%/*}"; then
+  REMOTE="${BASE%%/*}"
+  BRANCH="${BASE#*/}"
+  if git fetch --no-tags "$REMOTE" "$BRANCH"; then
+    EFFECTIVE_BASE="$BASE"
   fi
 fi
 
-# Validate after fetch attempt
-git rev-parse --verify "$BASE" 2>/dev/null && git rev-parse --verify "$HEAD" 2>/dev/null
+if [ -z "$EFFECTIVE_BASE" ]; then
+  # Try as a bare branch name on origin first, then any other remote.
+  REMOTES=$(git remote)
+  ORDERED=$(printf '%s\n' "$REMOTES" | awk '/^origin$/ {print; next} {others = others "\n" $0} END {if (others) print substr(others, 2)}')
+  for R in $ORDERED; do
+    if git fetch --no-tags "$R" "$BASE"; then
+      EFFECTIVE_BASE="$R/$BASE"
+      break
+    fi
+  done
+fi
+
+# Final validation: both endpoints must resolve.
+git rev-parse --verify "$EFFECTIVE_BASE" >/dev/null 2>&1
+git rev-parse --verify "$HEAD" >/dev/null 2>&1
 ```
 
-If either endpoint still fails to resolve after the fetch attempt, report "Invalid range: `<base>..<head>` -- `<base>` does not resolve (tried local and remote)" or similar for `<head>`, and exit gracefully without output. Do not fabricate a description from a partial or empty diff.
+If either endpoint still fails to resolve after the fetch attempts, report "Invalid range: `<base>..<head>` -- `<base>` does not resolve (tried local and remote)" or similar for `<head>`, and exit gracefully without output. Do not fabricate a description from a partial or empty diff.
 
 Gather merge base, commit list, and full diff:
 
 ```bash
-MERGE_BASE=$(git merge-base "$BASE" "$HEAD") && echo "MERGE_BASE=$MERGE_BASE" && echo '=== COMMITS ===' && git log --oneline $MERGE_BASE.."$HEAD" && echo '=== DIFF ===' && git diff $MERGE_BASE..."$HEAD"
+MERGE_BASE=$(git merge-base "$EFFECTIVE_BASE" "$HEAD") && echo "MERGE_BASE=$MERGE_BASE" && echo '=== COMMITS ===' && git log --oneline $MERGE_BASE.."$HEAD" && echo '=== DIFF ===' && git diff $MERGE_BASE..."$HEAD"
 ```
 
 If the commit list is empty, report "No commits between `<base>` and `<head>`" and exit gracefully.

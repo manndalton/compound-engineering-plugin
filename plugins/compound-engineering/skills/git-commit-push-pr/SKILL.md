@@ -59,7 +59,7 @@ Ask the user: "Update the PR description for this branch?" If declined, stop.
 
 ### DU-2: Find the PR
 
-Use the current branch and existing PR check from context. If the current branch is empty (detached HEAD), report no branch and stop. If the PR check returned `state: OPEN`, proceed to DU-3. Otherwise, report no open PR and stop.
+Use the current branch and existing PR check from context. If the current branch is empty (detached HEAD), report no branch and stop. If the PR check returned `state: OPEN`, note the PR `url` from the context block — this is the unambiguous reference to pass downstream — and proceed to DU-3. Otherwise, report no open PR and stop.
 
 ### DU-3: Write and apply the updated description
 
@@ -69,7 +69,7 @@ Read the current PR description to drive the compare-and-confirm step later:
 gh pr view --json body --jq '.body'
 ```
 
-**Generate the updated title and body** — load the `ce-pr-description` skill with `pr: <PR number from DU-2>`. If the user provided a focus (e.g., "include the benchmarking results"), pass it as `focus: <hint>`. The skill returns a `{title, body}` block without applying or prompting.
+**Generate the updated title and body** — load the `ce-pr-description` skill with `pr: <PR URL from DU-2>`. Use the full PR URL (e.g., `https://github.com/owner/repo/pull/123`) rather than a bare number so the delegate preserves repo/PR identity context and works correctly even when invoked from a worktree or subdirectory where the current repo is ambiguous. If the user provided a focus (e.g., "include the benchmarking results"), pass it as `focus: <hint>`. The skill returns a `{title, body}` block without applying or prompting.
 
 If `ce-pr-description` returns a "not open" or other graceful-exit message instead of a `{title, body}` pair, report that message and stop.
 
@@ -137,7 +137,7 @@ Priority order for commit messages and PR titles:
 
 Use the current branch and existing PR check from context. If the branch is empty, report detached HEAD and stop.
 
-If the PR check returned `state: OPEN`, note the URL -- continue to Step 4 and 5, then skip to Step 7 (existing PR flow). Otherwise, continue through Step 8.
+If the PR check returned `state: OPEN`, note the URL -- this is the existing-PR flow. Continue to Step 4 and 5 (commit any pending work and push), then go to Step 7 to ask whether to rewrite the description. Only run Step 6 (which generates a new description via `ce-pr-description`) if the user confirms the rewrite; Step 7's existing-PR sub-path consumes the `{title, body}` that Step 6 produces. Otherwise (no open PR), continue through Steps 6, 7, and 8 in order.
 
 ### Step 4: Branch, stage, and commit
 
@@ -182,6 +182,15 @@ The working-tree diff from Step 1 only shows uncommitted changes at invocation t
 
 If none resolve, ask the user to specify the target branch.
 
+**Gather the full branch diff (before evidence decision).** The working-tree diff from Step 1 only reflects uncommitted changes at invocation time — on the common "feature branch, all pushed, open PR" path, Step 1 skips the commit/push steps and the working-tree diff is empty. The evidence decision below needs the real branch diff to judge whether behavior is observable, so compute it explicitly against the base resolved above:
+
+```bash
+git fetch --no-tags <base-remote> <base-branch>
+git diff <base-remote>/<base-branch>...HEAD
+```
+
+Use this branch diff (not the working-tree diff) for the evidence decision. If the branch diff is empty (e.g., HEAD is already merged into the base or the branch has no unique commits), skip the evidence prompt and continue to delegation.
+
 **Evidence decision (before delegation).** If the branch diff changes observable behavior (UI, CLI output, API behavior with runnable code, generated artifacts, workflow output) and evidence is not otherwise blocked (unavailable credentials, paid services, deploy-only infrastructure, hardware), ask: "This PR has observable behavior. Capture evidence for the PR description?"
 
 - **Capture now** -- load the `ce-demo-reel` skill with a target description inferred from the branch diff. ce-demo-reel returns `Tier`, `Description`, and `URL`. Note the captured evidence so it can be passed as `focus:` context to `ce-pr-description` (e.g., "include the captured demo: <URL> as a `## Demo` section") or spliced into the returned body before apply. If capture returns `Tier: skipped` or `URL: "none"`, proceed with no evidence.
@@ -193,7 +202,7 @@ When evidence is not possible (docs-only, markdown-only, changelog-only, release
 **Delegate title and body generation to `ce-pr-description`.** Load the `ce-pr-description` skill with:
 
 - `range: <base-remote>/<base-branch>..HEAD` — for new PRs (no existing PR found in Step 3).
-- `pr: <existing PR number>` — for existing PRs (found in Step 3) that should be refreshed.
+- `pr: <existing PR URL>` — for existing PRs (found in Step 3) that should be refreshed. Pass the full PR URL from the Step 3 context (e.g., `https://github.com/owner/repo/pull/123`) rather than a bare number so the delegate preserves repo/PR identity context.
 - `focus: <hint>` — optional; include captured/linked evidence context or any user-supplied focus.
 
 `ce-pr-description` returns a `{title, body}` block. It applies the value-first writing principles, commit classification, sizing, narrative framing, writing voice, visual communication, numbering rules, and the Compound Engineering badge footer internally. Use the returned values verbatim in Step 7; do not layer manual edits onto them unless a focused adjustment is required (e.g., splicing an evidence block captured in this step that was not passed via `focus:`).
@@ -219,7 +228,7 @@ Keep the title under 72 characters; `ce-pr-description` already emits a conventi
 
 The new commits are already on the PR from Step 5. Report the PR URL, then ask whether to rewrite the description.
 
-- If **yes**, apply the returned title and body from `ce-pr-description`:
+- If **yes**, run Step 6 now to generate `{title, body}` via `ce-pr-description` (passing the existing PR URL as `pr:`), then apply the returned title and body:
 
   ```bash
   gh pr edit --title "<returned title>" --body "$(cat <<'EOF'
@@ -228,7 +237,7 @@ The new commits are already on the PR from Step 5. Report the PR URL, then ask w
   )"
   ```
 
-- If **no** -- done.
+- If **no** -- skip Step 6 entirely and finish. Do not run delegation or evidence capture when the user declined the rewrite.
 
 ### Step 8: Report
 
