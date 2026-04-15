@@ -69,11 +69,11 @@ Read the current PR description to drive the compare-and-confirm step later:
 gh pr view --json body --jq '.body'
 ```
 
-**Generate the updated title and body** — load the `ce-pr-description` skill with `pr: <PR URL from DU-2>`. Use the full PR URL (e.g., `https://github.com/owner/repo/pull/123`) rather than a bare number so the delegate preserves repo/PR identity context and works correctly even when invoked from a worktree or subdirectory where the current repo is ambiguous. If the user provided a focus (e.g., "include the benchmarking results"), pass it as `focus: <hint>`. The skill returns a `{title, body}` block without applying or prompting.
+**Generate the updated title and body** — load the `ce-pr-description` skill with the PR URL from DU-2 (e.g., `https://github.com/owner/repo/pull/123`). The URL preserves repo/PR identity even when invoked from a worktree or subdirectory where the current repo is ambiguous. If the user provided a focus (e.g., "include the benchmarking results"), append it as free-text steering after the URL. The skill returns a `{title, body}` block without applying or prompting.
 
 If `ce-pr-description` returns a "not open" or other graceful-exit message instead of a `{title, body}` pair, report that message and stop.
 
-**Evidence decision:** `ce-pr-description` preserves any existing `## Demo` or `## Screenshots` block from the current body by default. If the user's focus asks to refresh or remove evidence, pass that intent via the `focus:` hint — the skill will honor it. If no evidence block exists and one would benefit the reader, invoke `ce-demo-reel` separately to capture, then re-invoke `ce-pr-description` with an updated focus that references the captured evidence.
+**Evidence decision:** `ce-pr-description` preserves any existing `## Demo` or `## Screenshots` block from the current body by default. If the user's focus asks to refresh or remove evidence, pass that intent as steering text — the skill will honor it. If no evidence block exists and one would benefit the reader, invoke `ce-demo-reel` separately to capture, then re-invoke `ce-pr-description` with updated steering that references the captured evidence.
 
 **Compare and confirm** — briefly explain what the new description covers differently from the old one. This helps the user decide whether to apply; the description itself does not narrate these differences.
 
@@ -199,15 +199,14 @@ Use this branch diff (not the working-tree diff) for the evidence decision. If t
 
 When evidence is not possible (docs-only, markdown-only, changelog-only, release metadata, CI/config-only, test-only, or pure internal refactors), skip without asking.
 
-**Delegate title and body generation to `ce-pr-description`.** Load the `ce-pr-description` skill with:
+**Delegate title and body generation to `ce-pr-description`.** Load the `ce-pr-description` skill:
 
-- `range: <base-remote>/<base-branch>..HEAD` — for new PRs (no existing PR found in Step 3).
-- `pr: <existing PR URL>` — for existing PRs (found in Step 3) that should be refreshed. Pass the full PR URL from the Step 3 context (e.g., `https://github.com/owner/repo/pull/123`) rather than a bare number so the delegate preserves repo/PR identity context.
-- `focus: <hint>` — optional; include captured/linked evidence context or any user-supplied focus.
+- **For a new PR** (no existing PR found in Step 3): invoke with no PR reference. `ce-pr-description`'s current-branch mode auto-detects `origin/HEAD` (or an existing PR's base, if one somehow appears between Step 3 and now) and describes the commits on HEAD. Any captured-evidence context or user focus is passed as free-text steering (e.g., "include the captured demo: <URL> as a `## Demo` section").
+- **For an existing PR** (found in Step 3): invoke with the full PR URL from the Step 3 context (e.g., `https://github.com/owner/repo/pull/123`). The URL preserves repo/PR identity even when invoked from a worktree or subdirectory. Append any focus steering as free text after the URL.
 
-`ce-pr-description` returns a `{title, body}` block. It applies the value-first writing principles, commit classification, sizing, narrative framing, writing voice, visual communication, numbering rules, and the Compound Engineering badge footer internally. Use the returned values verbatim in Step 7; do not layer manual edits onto them unless a focused adjustment is required (e.g., splicing an evidence block captured in this step that was not passed via `focus:`).
+`ce-pr-description` returns a `{title, body}` block. It applies the value-first writing principles, commit classification, sizing, narrative framing, writing voice, visual communication, numbering rules, and the Compound Engineering badge footer internally. Use the returned values verbatim in Step 7; do not layer manual edits onto them unless a focused adjustment is required (e.g., splicing an evidence block captured in this step that was not passed as steering text).
 
-If `ce-pr-description` returns a graceful-exit message instead of `{title, body}` (e.g., invalid range, closed PR), report the message and stop — do not create or edit the PR.
+If `ce-pr-description` returns a graceful-exit message instead of `{title, body}` (e.g., closed PR, no commits to describe, base ref unresolved), report the message and stop — do not create or edit the PR.
 
 ### Step 7: Create or update the PR
 
