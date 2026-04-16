@@ -20,8 +20,8 @@ If `Resolve Before Planning` contains any items:
 
 Present only the options that apply, keeping the total at 4 or fewer:
 
-- **Proceed to planning (Recommended)** - Move to `/ce:plan` for structured implementation planning. Always shown.
-- **Proceed directly to work** - Skip planning and move to `/ce:work`; suited to lightweight, well-defined changes. Shown only when scope is lightweight, success criteria are clear, scope boundaries are clear, and no meaningful technical or research questions remain (the "direct-to-work gate").
+- **Proceed to planning (Recommended)** - Move to `/ce:plan` for structured implementation planning. Shown only when `Resolve Before Planning` is empty.
+- **Proceed directly to work** - Skip planning and move to `/ce:work`; suited to lightweight, well-defined changes. Shown only when `Resolve Before Planning` is empty **and** scope is lightweight, success criteria are clear, scope boundaries are clear, and no meaningful technical or research questions remain (the "direct-to-work gate").
 - **Continue the brainstorm** - Answer more clarifying questions to tighten scope, edge cases, and preferences. Always shown.
 - **View & share in Proof** - Open the requirements doc in Proof to read, comment, collaborate, and share a link. Shown only when a requirements document exists **and** the direct-to-work gate is not satisfied (when both conditions collide, `Proceed directly to work` takes priority and Proof becomes reachable via free-form request).
 - **Done for now** - Pause; the requirements doc is saved and can be resumed later. Always shown.

@@ -79,7 +79,7 @@ When the user selects "Create Issue", detect their project tracker:
 
 4. If no tracker is configured, ask the user which tracker they use with the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, ask in chat and wait for the reply. Options: `GitHub`, `Linear`, `Skip`. Then:
    - Proceed with the chosen tracker's command above
-   - Offer to persist the choice by adding `project_tracker: <choice>` to `AGENTS.md` so future runs skip this prompt
+   - Offer to persist the choice by adding `project_tracker: <value>` to `AGENTS.md`, where `<value>` is the lowercase tracker key (`github` or `linear`) — not the display label — so future runs match the detector in step 1 and skip this prompt
    - If `Skip`, return to the options without creating an issue
 
 5. If the detected tracker's CLI is not installed or not authenticated, surface a clear error (e.g., "`gh` CLI not found — install it or create the issue manually") and return to the options.
