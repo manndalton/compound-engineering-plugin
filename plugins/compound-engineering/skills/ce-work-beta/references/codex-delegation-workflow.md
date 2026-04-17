@@ -217,6 +217,8 @@ If tracked files are dirty, stop and present options: (1) commit current changes
 
 Write the prompt file, then make a single Bash tool call with `run_in_background: true` set on the tool parameter. This call returns immediately and has no timeout ceiling.
 
+Substitute the literal absolute path captured at setup for every `<scratch-dir>` below. Each Bash tool call starts a fresh shell, so the `$SCRATCH_DIR` variable from the setup snippet is not preserved — an unresolved `$SCRATCH_DIR` would expand empty and break result detection.
+
 ```bash
 # Substitute the resolved sandbox_mode value (yolo or full-auto) from the skill state
 SANDBOX_MODE="<sandbox_mode>"
@@ -232,9 +234,9 @@ codex exec \
   -m "<delegate_model>" \
   -c 'model_reasoning_effort="<delegate_effort>"' \
   $SANDBOX_FLAG \
-  --output-schema "$SCRATCH_DIR/result-schema.json" \
-  -o "$SCRATCH_DIR/result-batch-<batch-num>.json" \
-  - < "$SCRATCH_DIR/prompt-batch-<batch-num>.md"
+  --output-schema "<scratch-dir>/result-schema.json" \
+  -o "<scratch-dir>/result-batch-<batch-num>.json" \
+  - < "<scratch-dir>/prompt-batch-<batch-num>.md"
 ```
 
 Critical: `run_in_background: true` must be set as a **Bash tool parameter**, not as a shell `&` suffix. The tool parameter is what removes the timeout ceiling. A shell `&` inside a foreground Bash call still hits the 2-minute default timeout.
@@ -247,8 +249,10 @@ Do not improvise CLI flags or modify this invocation template.
 
 After the launch call returns, make a **new, separate** foreground Bash tool call that polls for the result file. This keeps the agent's turn active so the user cannot interfere with the working tree.
 
+Substitute the literal absolute path captured at setup for `<scratch-dir>`. The shell variable from Step A does not survive across separate Bash tool calls.
+
 ```bash
-RESULT_FILE="$SCRATCH_DIR/result-batch-<batch-num>.json"
+RESULT_FILE="<scratch-dir>/result-batch-<batch-num>.json"
 for i in $(seq 1 6); do
   test -s "$RESULT_FILE" && echo "DONE" && exit 0
   sleep 10
@@ -308,7 +312,7 @@ git commit -m "feat(<scope>): <batch summary>"
 
 **Circuit breaker:** After 3 consecutive failures, set `delegation_active` to false and emit: "Codex delegation disabled after 3 consecutive failures -- completing remaining units in standard mode."
 
-**Scratch cleanup:** No explicit cleanup needed — OS temp handles eventual cleanup (macOS `$TMPDIR` periodic purge; Linux/WSL `/tmp` reboot or periodic cleanup). Leaving `$SCRATCH_DIR` in place after the run also preserves intermediate artifacts for debugging if anything went wrong.
+**Scratch cleanup:** No explicit cleanup needed — OS temp handles eventual cleanup (macOS `$TMPDIR` periodic purge; Linux/WSL `/tmp` reboot or periodic cleanup). Leaving `<scratch-dir>` in place after the run also preserves intermediate artifacts for debugging if anything went wrong.
 
 ## Mixed-Model Attribution
 
