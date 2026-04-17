@@ -49,7 +49,7 @@ Keep the presentation concise. Allow brief follow-up questions and lightweight c
 
 Persistence is opt-in. The terminal review loop is a complete ideation cycle. Refinement loops happen in conversation with no file or network cost. Persistence triggers only when the user explicitly chooses to save, share, or hand off (selected in Phase 6).
 
-When the user picks an option in Phase 6 that requires a durable record (Brainstorm, Save and end), ensure a record exists first. When the user ends in conversation only or chooses to keep refining, no record is needed unless the user asks.
+When the user picks an option in Phase 6 that requires a durable record (Open and iterate in Proof, Brainstorm, Save and end), ensure a record exists first. When the user chooses to keep refining, no record is needed unless the user asks.
 
 **Mode-determined defaults:**
 
@@ -121,16 +121,16 @@ The Proof failure ladder in Phase 6.5 governs what happens when this hand-off fa
 
 **Caller-aware return.** The return-rule bullets below describe the default control flow, but the next step depends on which Phase 6 option invoked the Proof save. Apply the right branch for the caller:
 
-- **§6.1 Brainstorm a selected idea.** On a successful Proof return (`proceeded` or `done_for_now`), do **not** stop at the Phase 6 menu — after applying the per-status handling below (including any stale-local pull offer), continue into §6.1's remaining bullets (mark the chosen idea as `Explored`, then load `ce:brainstorm`). Only the `aborted` branch returns to the Phase 6 menu, since no durable record was written.
-- **§6.3 Save and end.** On a successful Proof return (`proceeded` or `done_for_now`), exit cleanly: narrate that the ideation was saved, surface the `docUrl` (and the local-path note if applicable), and stop. Do **not** re-ask the Phase 6 question — the user already chose to end. Only the `aborted` branch returns to the Phase 6 menu so the user can retry or pick a different path.
-- **Any other caller** (none currently defined in this workflow; included for robustness). Follow the bullets as written and return to the Phase 6 menu on every status.
+- **§6.2 Open and iterate in Proof.** Follow the bullets as written and return to the Phase 6 menu on every status — this option is explicitly about iterating on the Proof surface, so returning to the menu lets the user pick a follow-up action (brainstorm, save and end, or keep refining) after the review loop.
+- **§6.3 Brainstorm a selected idea.** On a successful Proof return (`proceeded` or `done_for_now`), do **not** stop at the Phase 6 menu — after applying the per-status handling below (including any stale-local pull offer), continue into §6.3's remaining bullets (mark the chosen idea as `Explored`, then load `ce:brainstorm`). Only the `aborted` branch returns to the Phase 6 menu, since no durable record was written.
+- **§6.4 Save and end.** On a successful Proof return (`proceeded` or `done_for_now`), exit cleanly: narrate that the ideation was saved, surface the `docUrl` (and the local-path note if applicable), and stop. Do **not** re-ask the Phase 6 question — the user already chose to end. Only the `aborted` branch returns to the Phase 6 menu so the user can retry or pick a different path.
 
 When the proof skill returns control:
 
-- `status: proceeded` with `localSynced: true` → the ideation doc on disk now reflects the review. Follow the caller-aware return rule above (continue §6.1 / exit §6.3 / otherwise return to the Phase 6 menu).
-- `status: proceeded` with `localSynced: false` → the reviewed version lives in Proof at `docUrl` but the local copy is stale. Offer to pull the Proof doc to `localPath` using the proof skill's Pull workflow. Follow the caller-aware return rule above; if the pull was declined, include a one-line note that `<localPath>` is stale vs. Proof so the next handoff (or the final §6.3 narration) doesn't read the old content silently. Placement: above the Phase 6 menu for the default caller, in the handoff preamble to `ce:brainstorm` for §6.1, or alongside the final save narration for §6.3.
-- `status: done_for_now` → the doc on disk may be stale if the user edited in Proof before leaving. Offer to pull the Proof doc to `localPath` so the local ideation artifact stays in sync, then follow the caller-aware return rule above. `done_for_now` means the user stopped the HITL loop — it does not mean they ended the whole ideation session (except when §6.3 was the caller, in which case their Phase 6 choice to end still stands). If the pull was declined, include the stale-local note at the placement described in the previous bullet.
-- `status: aborted` → fall back to the Phase 6 menu without changes, regardless of caller. No durable record was written, so §6.1 must not proceed with the brainstorm handoff and §6.3 must not end — the menu lets the user retry or pick another path.
+- `status: proceeded` with `localSynced: true` → the ideation doc on disk now reflects the review. Follow the caller-aware return rule above (return to menu for §6.2 / continue §6.3 / exit §6.4).
+- `status: proceeded` with `localSynced: false` → the reviewed version lives in Proof at `docUrl` but the local copy is stale. Offer to pull the Proof doc to `localPath` using the proof skill's Pull workflow. Follow the caller-aware return rule above; if the pull was declined, include a one-line note that `<localPath>` is stale vs. Proof so the next handoff (or the final §6.4 narration) doesn't read the old content silently. Placement: above the Phase 6 menu for the §6.2 caller, in the handoff preamble to `ce:brainstorm` for §6.3, or alongside the final save narration for §6.4.
+- `status: done_for_now` → the doc on disk may be stale if the user edited in Proof before leaving. Offer to pull the Proof doc to `localPath` so the local ideation artifact stays in sync, then follow the caller-aware return rule above. `done_for_now` means the user stopped the HITL loop — it does not mean they ended the whole ideation session (except when §6.4 was the caller, in which case their Phase 6 choice to end still stands). If the pull was declined, include the stale-local note at the placement described in the previous bullet.
+- `status: aborted` → fall back to the Phase 6 menu without changes, regardless of caller. No durable record was written, so §6.3 must not proceed with the brainstorm handoff and §6.4 must not end — the menu lets the user retry or pick another path.
 
 ## Phase 6: Refine or Hand Off
 
@@ -140,22 +140,14 @@ Ask what should happen next using the platform's blocking question tool (`AskUse
 
 Offer these four options (each label is self-contained per the Interactive Question Tool Design rules in the plugin AGENTS.md — the distinguishing word is front-loaded so options stay distinct when truncated):
 
-1. **Brainstorm a selected idea** — load `ce:brainstorm` with the chosen idea as the seed. The orchestrator first writes a durable record using the mode default in Phase 5.
-2. **Refine the ideation in conversation** — add ideas, re-evaluate, or deepen analysis. No file or network side effects.
-3. **Save and end** — persist the ideation using the mode default (file in repo mode, Proof in elsewhere mode), then end.
-4. **End in conversation only** — no save, no Proof. The terminal review was the value.
+1. **Refine the ideation in conversation** — add ideas, re-evaluate, or deepen analysis. No file or network side effects.
+2. **Open and iterate in Proof** — save the ideation to Proof and enter the proof skill's HITL review loop: iterate via comments in the Proof editor; reviewed edits sync back to `docs/ideation/` in repo mode.
+3. **Brainstorm a selected idea** — load `ce:brainstorm` with the chosen idea as the seed. The orchestrator first writes a durable record using the mode default in Phase 5.
+4. **Save and end** — persist the ideation using the mode default (file in repo mode, Proof in elsewhere mode), then end.
 
 Do not delete the run's scratch directory (`.context/compound-engineering/ce-ideate/<run-id>/`) on completion. The V15 web-research cache is session-scoped and reused across run-ids by later ideation invocations in the same session (see `references/web-research-cache.md`); per-run cleanup would defeat that reuse. Checkpoint A (`raw-candidates.md`) and Checkpoint B (`survivors.md`) are cheap to leave behind and follow the repo's Scratch Space convention — `.context/` is session-scoped scratch space that another skill invocation may need, and natural session/OS cleanup handles it.
 
-### 6.1 Brainstorm a Selected Idea
-
-- Write or update the durable record per the mode default in Phase 5 (file in repo mode, Proof in elsewhere mode). When this routes through §5.2 Proof Save, apply §5.2's caller-aware return rule: continue into the next bullet on a successful Proof return instead of bouncing back to the Phase 6 menu. If Proof returned `aborted` (no durable record written), go back to the Phase 6 menu and do **not** proceed with the brainstorm handoff.
-- Mark the chosen idea as `Explored` in the saved record
-- Load the `ce:brainstorm` skill with the chosen idea as the seed
-
-Do **not** skip brainstorming and go straight to planning from ideation output.
-
-### 6.2 Refine the Ideation in Conversation
+### 6.1 Refine the Ideation in Conversation
 
 Route refinement by intent:
 
@@ -163,13 +155,29 @@ Route refinement by intent:
 - `re-evaluate` or `raise the bar` -> return to Phase 3
 - `dig deeper on idea #N` -> expand only that idea's analysis
 
-No persistence triggers during refinement. The user can choose Save and end (or Brainstorm) when they are ready to persist.
+No persistence triggers during refinement. The user can choose Save and end (or Brainstorm, or Open and iterate in Proof) when they are ready to persist.
 
-### 6.3 Save and End
+### 6.2 Open and Iterate in Proof
+
+Invoke the Proof HITL review path via §5.2 with §6.2 as the caller. In repo mode, ensure the local file exists first (run §5.1) so the HITL sync-back has a target; in elsewhere mode, §5.2 renders to a temp file as usual. Honor Phase 5's "ensure a record exists first" contract either way.
+
+Apply §5.2's caller-aware return rule for the §6.2 branch: return to the Phase 6 menu on every status (success or `aborted`). This option is explicitly about iterating, so the user expects to pick a follow-up action afterward (brainstorm the refined survivors, save and end, or keep refining in conversation).
+
+If the Proof handoff fails, the §6.5 Proof Failure Ladder governs recovery.
+
+### 6.3 Brainstorm a Selected Idea
+
+- Write or update the durable record per the mode default in Phase 5 (file in repo mode, Proof in elsewhere mode). When this routes through §5.2 Proof Save, apply §5.2's caller-aware return rule: continue into the next bullet on a successful Proof return instead of bouncing back to the Phase 6 menu. If Proof returned `aborted` (no durable record written), go back to the Phase 6 menu and do **not** proceed with the brainstorm handoff.
+- Mark the chosen idea as `Explored` in the saved record
+- Load the `ce:brainstorm` skill with the chosen idea as the seed
+
+Do **not** skip brainstorming and go straight to planning from ideation output.
+
+### 6.4 Save and End
 
 Persist via the mode default (5.1 in repo mode, 5.2 in elsewhere mode), then end. If the user instead asked to use the non-default destination, honor that explicit request.
 
-When the path lands in a Proof save (5.2), apply §5.2's caller-aware return rule for the §6.3 branch: on a successful Proof return, exit cleanly — narrate the save, surface the `docUrl` (and any stale-local note if the pull was declined), and stop. Do **not** loop back to the Phase 6 menu; the user already chose to end. Only a `status: aborted` from Proof returns to the menu so the user can retry or pick another path (file save, custom path, or end in conversation only). The §6.5 Proof Failure Ladder still governs persistent Proof failures and ends at the Phase 6 menu — that failure-recovery path is distinct from the successful-save exit described here.
+When the path lands in a Proof save (5.2), apply §5.2's caller-aware return rule for the §6.4 branch: on a successful Proof return, exit cleanly — narrate the save, surface the `docUrl` (and any stale-local note if the pull was declined), and stop. Do **not** loop back to the Phase 6 menu; the user already chose to end. Only a `status: aborted` from Proof returns to the menu so the user can retry or pick another path (file save, custom path, or keep refining). The §6.5 Proof Failure Ladder still governs persistent Proof failures and ends at the Phase 6 menu — that failure-recovery path is distinct from the successful-save exit described here.
 
 When the path lands in a file save (5.1):
 
@@ -179,10 +187,6 @@ When the path lands in a file save (5.1):
 - if the user declines, leave the file uncommitted
 
 After the file save (and optional commit), end the session — do not return to the Phase 6 menu.
-
-### 6.4 End in Conversation Only
-
-No file save, no Proof handoff. Acknowledge briefly and stop.
 
 ### 6.5 Proof Failure Ladder
 
@@ -205,7 +209,7 @@ Distinguish create-failure from ops-failure by inspecting whether the proof skil
 
 If proof returned a partial `docUrl` before failing, surface that URL alongside the fallback options so the user can recover or share the partial record.
 
-After the fallback completes (any path), continue back to the Phase 6 menu so the user can still brainstorm, refine, or end.
+After the fallback completes (any path), continue back to the Phase 6 menu so the user can still refine, iterate in Proof, brainstorm, or save and end.
 
 ## Quality Bar
 
