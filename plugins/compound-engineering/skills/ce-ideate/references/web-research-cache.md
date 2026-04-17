@@ -18,17 +18,24 @@ Read this when checking the V15 cache before dispatching `web-researcher`, or wh
 ]
 ```
 
-Files live under `.context/compound-engineering/ce-ideate/<run-id>/web-research-cache.json`. If `.context/` namespacing is unavailable, fall back to OS temp (`mktemp -d -t ce-ideate-XXXXXX`) per the repo Scratch Space convention; reuse becomes within-process only in that case.
+Files live under `<scratch-dir>/web-research-cache.json`, where `<scratch-dir>` is the absolute OS-temp path resolved once in SKILL.md Phase 1 (`"${TMPDIR:-/tmp}/compound-engineering/ce-ideate/<run-id>"`). Do not pass the unresolved `${TMPDIR:-/tmp}` string to non-shell tools; always use the absolute path captured in Phase 1.
 
 ## Reuse check
 
-Before dispatching `web-researcher`, glob `.context/compound-engineering/ce-ideate/*/web-research-cache.json` across run-ids — refinement loops within a session may legitimately reuse another run's cache by topic, not run-id. If any entry's `key` matches the current dispatch (same mode + same case-insensitive normalized focus hint + same topic surface hash), skip the dispatch and pass the cached `result` to the consolidated grounding summary. Note in the summary: "Reusing prior web research from this session — say 're-research' to refresh."
+Before dispatching `web-researcher`, resolve the scratch root (the parent of `<scratch-dir>`) in bash and list sibling run-id directories — refinement loops within a session may legitimately reuse another run's cache by topic, not run-id:
+
+```bash
+SCRATCH_ROOT="${TMPDIR:-/tmp}/compound-engineering/ce-ideate"
+ls "$SCRATCH_ROOT"/*/web-research-cache.json 2>/dev/null
+```
+
+Read each matching file. If any entry's `key` matches the current dispatch (same mode + same case-insensitive normalized focus hint + same topic surface hash), skip the dispatch and pass the cached `result` to the consolidated grounding summary. Note in the summary: "Reusing prior web research from this session — say 're-research' to refresh."
 
 On `re-research` override, delete the matching entry and dispatch fresh.
 
 ## Append after fresh dispatch
 
-After a fresh dispatch, append the new result to the current run's cache file at `.context/compound-engineering/ce-ideate/<run-id>/web-research-cache.json` (create directory and file if needed). The next invocation in the session can reuse it via the glob above.
+After a fresh dispatch, append the new result to the current run's cache file at `<scratch-dir>/web-research-cache.json` using the absolute path from Phase 1 (create directory and file if needed). The next invocation in the session can reuse it via the glob above.
 
 ## Topic surface hash
 
