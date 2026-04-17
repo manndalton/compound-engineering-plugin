@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Compound-Engineering Release Notes
 
-Look up what shipped in recent releases of the compound-engineering plugin. Bare invocation summarizes the last 10 plugin releases. Argument invocation answers a specific question, citing the release version that introduced the change.
+Look up what shipped in recent releases of the compound-engineering plugin. Bare invocation summarizes the last 5 plugin releases. Argument invocation searches the last 40 releases and answers a specific question, citing the release version that introduced the change.
 
 Data comes from the GitHub Releases API for `EveryInc/compound-engineering-plugin`, filtered to the `compound-engineering-v*` tag prefix so sibling components (`cli-v*`, `coding-tutor-v*`, `marketplace-v*`, `cursor-marketplace-v*`) are excluded.
 
@@ -64,7 +64,7 @@ The shape on failure is:
 
 If `ok: false`, print `error.message`, a blank line, then `error.user_hint`. Stop.
 
-If `ok: true`, take the first 10 entries from `releases` (the helper has already filtered to `compound-engineering-v*` and sorted newest first). If fewer than 10 are available, render whatever count came back without warning.
+If `ok: true`, take the first 5 entries from `releases` (the helper has already filtered to `compound-engineering-v*` and sorted newest first). If fewer than 5 are available, render whatever count came back without warning.
 
 For each release, render:
 
@@ -80,9 +80,10 @@ For each release, render:
 
 **Soft 25-line cap.** If the body exceeds 25 rendered lines, keep the first 25 lines and append `— N more changes, [see full release notes →]({url})`. Truncation must be **markdown-fence aware**: count the triple-backtick fence lines that appear in the kept portion. If the count is odd, the cut landed inside an open code fence; close it with a `` ``` `` line on the truncated output before appending the "see more" link, so renderers do not swallow the link or following content.
 
-After all releases are rendered, append a one-line footer:
+After all releases are rendered, append a two-line footer:
 
 ```
+Showing the last 5 releases. For older history, ask a specific question (e.g., `/ce:release-notes what happened to <skill>?`).
 Browse all releases at https://github.com/EveryInc/compound-engineering-plugin/releases
 ```
 
@@ -93,14 +94,14 @@ Stop. Summary mode is done.
 Run the helper with a wider buffer so the search window can be filled even when sibling tags interleave heavily:
 
 ```bash
-python3 scripts/list-plugin-releases.py --limit 60
+python3 scripts/list-plugin-releases.py --limit 100
 ```
 
 Apply the same launch-failure handling as Phase 2 (fixed `python3 is required…` message if the helper subprocess can't even start).
 
 If `ok: false`, print `error.message`, a blank line, then `error.user_hint`. Stop. Same shape as Phase 3.
 
-If `ok: true`, take the first 20 entries from `releases` as the search window.
+If `ok: true`, take the first 40 entries from `releases` as the search window (fewer if the plugin does not yet have 40 releases).
 
 ## Phase 6 — Confidence Judgment
 
@@ -148,7 +149,7 @@ Stop.
 Print this line literally — the URL is hardcoded so it cannot drift:
 
 ```
-I couldn't find this in the last 20 plugin releases. Browse the full history at https://github.com/EveryInc/compound-engineering-plugin/releases
+I couldn't find this in the last 40 plugin releases. Browse the full history at https://github.com/EveryInc/compound-engineering-plugin/releases
 ```
 
 Stop.
