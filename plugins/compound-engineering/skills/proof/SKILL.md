@@ -133,7 +133,7 @@ curl -X POST "https://www.proofeditor.ai/api/agent/{slug}/edit/v2" \
     "baseToken": "mt1:<token>",
     "operations": [
       {"op": "replace_block", "ref": "b3", "block": {"markdown": "Updated paragraph."}},
-      {"op": "insert_after", "ref": "b3", "blocks": [{"markdown": "## New section"}]}
+      {"op": "insert_after", "ref": "b3", "block": {"markdown": "## New section"}}
     ]
   }'
 ```
