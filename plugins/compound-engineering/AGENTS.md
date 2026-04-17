@@ -182,6 +182,8 @@ grep -E '^description:' skills/*/SKILL.md
 
 Beta skills use a `-beta` suffix and `disable-model-invocation: true` to prevent accidental auto-triggering. See `docs/solutions/skill-design/beta-skills-framework.md` for naming, validation, and promotion rules.
 
+**Caveat on non-beta use of `disable-model-invocation`:** The flag blocks all model-initiated invocations via the Skill tool, which includes scheduled re-entry from `/loop`. Only a user typing a slash command directly bypasses it. If a skill is intended to be schedulable (e.g., `resolve-pr-feedback`), do not set this flag — rely on description specificity and argument requirements to prevent accidental auto-fire instead.
+
 ### Stable/Beta Sync
 
 When modifying a skill that has a `-beta` counterpart (or vice versa), always check the other version and **state your sync decision explicitly** before committing — e.g., "Propagated to beta — shared test guidance" or "Not propagating — this is the experimental delegate mode beta exists to test." Syncing to both, stable-only, and beta-only are all valid outcomes. The goal is deliberate reasoning, not a default rule.
