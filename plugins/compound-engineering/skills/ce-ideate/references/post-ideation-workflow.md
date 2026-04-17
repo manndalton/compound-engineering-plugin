@@ -142,10 +142,12 @@ Ask what should happen next using the platform's blocking question tool (`AskUse
 
 Offer these four options (each label is self-contained per the Interactive Question Tool Design rules in the plugin AGENTS.md — the distinguishing word is front-loaded so options stay distinct when truncated):
 
-1. **Refine the ideation in conversation** — add ideas, re-evaluate, or deepen analysis. No file or network side effects.
+1. **Refine the ideation in conversation (or stop here — no save)** — add ideas, re-evaluate, or deepen analysis. No file or network side effects; ending the conversation at any point after this pick is a valid no-save exit.
 2. **Open and iterate in Proof** — save the ideation to Proof and enter the proof skill's HITL review loop: iterate via comments in the Proof editor; reviewed edits sync back to `docs/ideation/` in repo mode.
 3. **Brainstorm a selected idea** — load `ce:brainstorm` with the chosen idea as the seed. The orchestrator first writes a durable record using the mode default in Phase 5.
 4. **Save and end** — persist the ideation using the mode default (file in repo mode, Proof in elsewhere mode), then end.
+
+No-save exit is supported without a dedicated menu option. Pick option 1 and stop the conversation, or use the question tool's free-text escape to say so directly — persistence is opt-in and the terminal review loop is already a complete ideation cycle.
 
 Do not delete the run's scratch directory (`<scratch-dir>` resolved in Phase 1) on completion. The V15 web-research cache is session-scoped and reused across run-ids by later ideation invocations in the same session (see `references/web-research-cache.md`); per-run cleanup would defeat that reuse. Checkpoint A (`raw-candidates.md`) and Checkpoint B (`survivors.md`) are cheap to leave behind and follow the repo's Scratch Space cross-invocation-reusable convention — OS handles eventual cleanup.
 
@@ -158,6 +160,8 @@ Route refinement by intent:
 - `dig deeper on idea #N` -> expand only that idea's analysis
 
 No persistence triggers during refinement. The user can choose Save and end (or Brainstorm, or Open and iterate in Proof) when they are ready to persist.
+
+Ending after refinement — or without any refinement at all — is a valid no-save exit. There is no required next step; stopping the conversation here leaves no durable artifact, which matches the opt-in persistence contract.
 
 ### 6.2 Open and Iterate in Proof
 

@@ -8,7 +8,7 @@ Read this when checking the V15 cache before dispatching `web-researcher`, or wh
 [
   {
     "key": {
-      "mode": "repo|elsewhere",
+      "mode": "repo|elsewhere-software|elsewhere-non-software",
       "focus_hint_normalized": "<lowercase, whitespace-collapsed focus hint or empty string>",
       "topic_surface_hash": "<short hash of the user-supplied topic surface>"
     },
@@ -26,21 +26,23 @@ Before dispatching `web-researcher`, resolve the scratch root (the parent of `<s
 
 ```bash
 SCRATCH_ROOT="${TMPDIR:-/tmp}/compound-engineering/ce-ideate"
-ls "$SCRATCH_ROOT"/*/web-research-cache.json 2>/dev/null
+find "$SCRATCH_ROOT" -maxdepth 2 -name 'web-research-cache.json' -type f 2>/dev/null
 ```
 
-Read each matching file. If any entry's `key` matches the current dispatch (same mode + same case-insensitive normalized focus hint + same topic surface hash), skip the dispatch and pass the cached `result` to the consolidated grounding summary. Note in the summary: "Reusing prior web research from this session — say 're-research' to refresh."
+`find` exits 0 with empty output when no cache files exist, so the first-run case does not abort the reuse-check step.
+
+Read each matching file. If any entry's `key` matches the current dispatch (same full mode variant — `repo`, `elsewhere-software`, or `elsewhere-non-software` — plus same case-insensitive normalized focus hint plus same topic surface hash), skip the dispatch and pass the cached `result` to the consolidated grounding summary. Mode variants must match exactly: `elsewhere-software` and `elsewhere-non-software` are distinct domains and must not cross-reuse. Note in the summary: "Reusing prior web research from this session — say 're-research' to refresh."
 
 On `re-research` override, delete the matching entry and dispatch fresh.
 
 ## Append after fresh dispatch
 
-After a fresh dispatch, append the new result to the current run's cache file at `<scratch-dir>/web-research-cache.json` using the absolute path from Phase 1 (create directory and file if needed). The next invocation in the session can reuse it via the glob above.
+After a fresh dispatch, append the new result to the current run's cache file at `<scratch-dir>/web-research-cache.json` using the absolute path from Phase 1 (create directory and file if needed). The next invocation in the session can reuse it via the `find` listing above.
 
 ## Topic surface hash
 
 The topic surface is the user-supplied content the web research is grounded on:
-- **Elsewhere mode:** the user's topic prompt plus any Phase 0.4 intake answers (the actual subject the agent is researching).
+- **Elsewhere modes (`elsewhere-software`, `elsewhere-non-software`):** the user's topic prompt plus any Phase 0.4 intake answers (the actual subject the agent is researching). The two sub-modes are keyed separately — a reclassification between software and non-software for the same topic hash must force a fresh dispatch, since the research domain differs.
 - **Repo mode:** the focus hint plus a short repo identifier (e.g., the repo root name). This keeps the cache key meaningful when focus is empty — two bare-prompt invocations in the same repo legitimately share research, but the key still differentiates repos.
 
 Normalize before hashing: lowercase, collapse whitespace.
