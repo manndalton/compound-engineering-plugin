@@ -176,6 +176,25 @@ describe("list-plugin-releases.py", () => {
       expect(data.releases[0].body).toBe("")
       expect(data.releases[0].linked_prs).toEqual([])
     })
+
+    test("url prefers html_url over api url when both present", async () => {
+      const apiShaped = {
+        tag_name: PLUGIN_267.tagName,
+        name: PLUGIN_267.name,
+        published_at: PLUGIN_267.publishedAt,
+        html_url:
+          "https://github.com/EveryInc/compound-engineering-plugin/releases/tag/compound-engineering-v2.67.0",
+        url:
+          "https://api.github.com/repos/EveryInc/compound-engineering-plugin/releases/310187170",
+        body: PLUGIN_267.body,
+      }
+      const ghBin = await makeGhShim(JSON.stringify([apiShaped]))
+      const result = await runHelper(["--limit", "10"], { ghBin })
+      const data = JSON.parse(result.stdout)
+      expect(data.releases[0].url).toBe(
+        "https://github.com/EveryInc/compound-engineering-plugin/releases/tag/compound-engineering-v2.67.0",
+      )
+    })
   })
 
   describe("gh fallback to anon", () => {

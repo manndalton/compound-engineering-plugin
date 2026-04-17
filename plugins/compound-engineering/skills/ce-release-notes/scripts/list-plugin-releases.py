@@ -75,7 +75,7 @@ def _normalize_release(raw):
         "version": _version_from_tag(tag),
         "name": raw.get("name") or "",
         "published_at": raw.get("publishedAt") or raw.get("published_at") or "",
-        "url": raw.get("url") or raw.get("html_url") or "",
+        "url": raw.get("html_url") or raw.get("url") or "",
         "body": body,
         "linked_prs": _extract_linked_prs(body),
     }
