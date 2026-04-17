@@ -22,6 +22,8 @@ Match depth to scope:
 
 Apply the discrimination test before asking anything. Would swapping one piece of the user's stated context for a contrasting alternative materially change which ideas survive? If yes, the context is load-bearing — proceed. If no, ask 1-3 narrowly chosen questions, building on what the user already provided rather than starting from a template. After each answer, re-apply the test before asking another. Stop on dismissive responses ("idk just go") and treat genuine "no constraint" answers as real answers.
 
+**Grounding freshness.** Phase 1 elsewhere-mode grounding (user-context synthesis + learnings + web-research) has already run before this reference takes over, and its outputs feed the generation below. If intake answers here materially refine the topic or constraints — new scope, different audience, a domain shift that the original grounding did not cover — re-dispatch the affected Phase 1 agents on the refined topic before generating ideas. The guardrail mirrors SKILL.md Phase 0.4's rule that mode and grounding re-evaluate when intake changes the scope to be acted on; ranking against stale grounding risks surfacing ideas fit to the wrong topic.
+
 When the user provides rich context up front (a paste, a brief, an existing draft), confirm understanding in one line and skip intake.
 
 ## How to generate
@@ -51,7 +53,7 @@ Persistence is opt-in. The terminal review loop is a complete ideation cycle. Re
 
 Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini) — or numbered options in chat as a fallback — and offer four choices:
 
-- **Brainstorm a selected idea** — hand off to `ce:brainstorm` with the chosen idea as the seed (universal facilitation in `ce:brainstorm` will pick up the non-software domain).
+- **Brainstorm a selected idea** — before handoff, persist the ideation per the Phase 6.1 contract in `references/post-ideation-workflow.md`: save the survivors to Proof (the elsewhere-mode default) or to `docs/ideation/` when the user explicitly asked for a local file, mark the chosen idea as `Explored` in the saved record, then load `ce:brainstorm` with that idea as the seed. On a successful Proof return (`proceeded` or `done_for_now`), continue into the brainstorm handoff per §5.2's caller-aware return rule; on `aborted`, return to this menu without handing off. On persistent Proof failure, apply the Phase 6.5 Proof Failure Ladder before ending so the brainstorm seed is preserved through a local-save fallback. (Universal facilitation in `ce:brainstorm` picks up the non-software domain.)
 - **Refine the ideation in conversation** — add ideas, re-evaluate, or deepen analysis without writing anything.
 - **Save and end** — share the survivors to Proof (the elsewhere-mode default) and end. Use `docs/ideation/` instead only when the user explicitly asks for a local file. On Proof failure (including after the single orchestrator-side retry), apply the Phase 6.5 Proof Failure Ladder from `references/post-ideation-workflow.md` — surface the local-save fallback menu (custom path or skip) before ending so the user is not stranded without a recovery path.
 - **End in conversation only** — no save, no file, no Proof. The conversation was the value.
