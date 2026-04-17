@@ -349,7 +349,7 @@ Assemble the body in this order:
 Write the composed body to an OS temp file, then return the title and the file path. Do not call `gh pr edit`, `gh pr create`, or any other mutating command. Do not ask the user to confirm — the caller owns apply.
 
 ```bash
-BODY_FILE=$(mktemp -u -t ce-pr-body) && cat > "$BODY_FILE" <<'__CE_PR_BODY_END__'
+BODY_FILE=$(mktemp -u "${TMPDIR:-/tmp}/ce-pr-body.XXXXXX") && cat > "$BODY_FILE" <<'__CE_PR_BODY_END__'
 <the composed body markdown goes here, verbatim>
 __CE_PR_BODY_END__
 echo "$BODY_FILE"
