@@ -6,7 +6,7 @@ argument-hint: "[PR ref e.g. pr:561 | #561 | URL] [free-text steering]"
 
 # CE PR Description
 
-Generate a conventional-commit-style title and a value-first body describing a pull request's work. Returns structured `{title, body_file}` for the caller to apply — this skill never invokes `gh pr edit` or `gh pr create`, and never prompts for interactive confirmation. The body is written to an OS temp file (via `mktemp`) rather than emitted inline, so callers can pass it to `gh pr edit/create` via `cat` substitution without the body being tokenized twice (once in the skill's return, once in the caller's heredoc).
+Generate a conventional-commit-style title and a value-first body describing a pull request's work. Returns structured `{title, body_file}` for the caller to apply — this skill never invokes `gh pr edit` or `gh pr create`, and never prompts for interactive confirmation.
 
 Why a separate skill: several callers need the same writing logic without the single-PR interactive scaffolding that lives in `git-commit-push-pr`. `ce-pr-stack`'s splitting workflow runs this once per layer as a batch; `git-commit-push-pr` runs it inside its full-flow and refresh-mode paths. Extracting keeps one source of truth for the writing principles.
 
@@ -346,9 +346,7 @@ Assemble the body in this order:
 
 ## Step 9: Return `{title, body_file}`
 
-Write the composed body to an OS temp file, then return the title and the file path to the caller. Do not call `gh pr edit`, `gh pr create`, or any other mutating command. Do not ask the user to confirm. The caller owns apply.
-
-Generate a unique temp path and write the body to it in a single bash call, then print the path so the caller can capture it:
+Write the composed body to an OS temp file, then return the title and the file path. Do not call `gh pr edit`, `gh pr create`, or any other mutating command. Do not ask the user to confirm — the caller owns apply.
 
 ```bash
 BODY_FILE=$(mktemp -u -t ce-pr-body) && cat > "$BODY_FILE" <<'__CE_PR_BODY_END__'
@@ -357,15 +355,9 @@ __CE_PR_BODY_END__
 echo "$BODY_FILE"
 ```
 
-This is the value-producing preparatory pattern that AGENTS.md explicitly permits: `cat` strictly consumes the path `mktemp -u` just produced, and splitting would require manually threading the path through two bash calls. The final `echo "$BODY_FILE"` surfaces the path to the caller as the bash tool's stdout.
+`mktemp -u` picks a unique path without creating the file; the heredoc creates it. The quoted sentinel `'__CE_PR_BODY_END__'` keeps `$VAR`, backticks, `${...}`, and any literal `EOF` inside the body from being expanded or clashing with the terminator.
 
-Design notes:
-
-- `mktemp -u -t ce-pr-body` prints a unique path like `/tmp/ce-pr-body.abc123` (Linux) or `/var/folders/.../T/ce-pr-body.abc123` (macOS) without creating the file. The `-u` flag ("unsafe, don't create") is used because the heredoc write creates the file itself — creating it twice is pointless, and some sandboxes (Claude Code's `Write` tool among them) refuse to write to files they haven't `Read` first. This form is portable across macOS (BSD) and Linux (GNU) and avoids the macOS quirk where mid-template `XXXXXX` doesn't substitute. No `.md` suffix is needed — `gh pr edit --body "$(cat <path>)"` reads the bytes regardless of extension.
-- The sentinel marker `__CE_PR_BODY_END__` is used verbatim — not `EOF`, because PR bodies can legitimately contain literal `EOF` in code blocks and collide with the heredoc terminator. Quoting the sentinel (`<<'__CE_PR_BODY_END__'`) disables shell expansion inside the heredoc, so `$VAR`, backticks, and `${...}` in the body stay literal.
-- Why not use the native file-write tool (e.g., `Write` in Claude Code): the tool commonly refuses to overwrite a file the session hasn't `Read` yet and is often sandboxed to the workspace directory, so it can't write to `/tmp`. A bash heredoc write sidesteps both constraints. The body is emitted as output tokens exactly once (in the bash command parameter) — identical cost to a Write tool call. The savings versus the old flow come from not re-emitting the body again in the caller's `gh pr edit/create` invocation.
-
-Format the return as a clearly labeled block so the caller can extract cleanly:
+Format the return as a clearly labeled block the caller can extract cleanly:
 
 ```
 === TITLE ===
@@ -375,7 +367,7 @@ Format the return as a clearly labeled block so the caller can extract cleanly:
 <absolute path to the mktemp body file>
 ```
 
-Do not emit the body markdown itself in the return block. The caller reads it from `BODY_FILE` via `cat` substitution inside its `gh pr edit`/`gh pr create` invocation. This avoids tokenizing the body twice (once in the return, once in the caller's tool call) and sidesteps heredoc-escaping bugs when the body contains shell metacharacters.
+Do not emit the body markdown in the return block — the caller reads it from `BODY_FILE`.
 
 If Step 1 exited gracefully (closed/merged PR, invalid range, empty commit list), do not create a body file — just return the reason string.
 

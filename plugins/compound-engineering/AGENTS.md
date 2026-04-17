@@ -102,6 +102,12 @@ Skill content loaded at trigger time is carried in every subsequent message — 
 - [ ] Use imperative/infinitive form (verb-first instructions)
 - [ ] Avoid second person ("you should") - use objective language ("To accomplish X, do Y")
 
+### Rationale Discipline
+
+Every line in `SKILL.md` loads on every invocation. Include rationale only when it changes what the agent does at runtime — if behavior wouldn't differ without the sentence, cut it.
+
+Keep rationale at the highest-level location that covers it; restate behavioral directives at the point they take effect. A 500-line skill shouldn't hinge on the agent remembering line 9 by line 400. Portability notes, defenses against mistakes the agent wasn't going to make, and meta-commentary about this repo's authoring rules belong in commit messages or `docs/solutions/`, not in the skill body.
+
 ### Cross-Platform User Interaction
 
 - [ ] When a skill needs to ask the user a question, instruct use of the platform's blocking question tool and name the known equivalents (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini)
