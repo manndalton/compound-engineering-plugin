@@ -92,7 +92,7 @@ Sample wording (refine to fit the prompt at hand; follow the Interactive Questio
 
 If the user confirms or selects "elsewhere," still run Decision 2 to choose between elsewhere-software and elsewhere-non-software.
 
-**Routing rule.** When Decision 2 = non-software, read `references/universal-ideation.md` and follow that facilitation reference instead of the software phases below. Do not run Phase 1 codebase scan or Phase 2 software frame dispatch.
+**Routing rule.** When Decision 2 = non-software, still run Phase 1 Elsewhere-mode grounding (user-context synthesis + learnings + web-research; skip phrases honored) — the learnings and external-grounding dispatch is mode-symmetric. Then read `references/universal-ideation.md` and follow that facilitation reference in place of Phase 2's software frame dispatch and the post-ideation wrap-up. Do not run the repo-specific codebase scan at any point.
 
 If any prompt-broadening or intake step (0.4 below) materially changes the topic, re-evaluate the mode statement before dispatching Phase 1 — classify on the scope to be acted on, not the scope at first read.
 
@@ -132,12 +132,12 @@ When the user provides rich context up front (a paste, a brief, an existing draf
 
 #### 0.5 Cost Transparency Notice
 
-Before dispatching Phase 1, surface the agent count for the inferred mode in one short line so multi-agent cost is not invisible. Compute the count from the actual dispatch decision: 1 grounding-context agent (codebase scan in repo mode; user-context synthesis in elsewhere) + 1 learnings + 1 web-researcher + 6 ideation = baseline 9. Add 1 if issue-tracker intent triggered (repo mode only). Add 1 if the user opted into Slack research. Subtract 1 if the user issued a web-research skip phrase or V15 reuse will fire.
+Before dispatching Phase 1, surface the agent count for the inferred mode in one short line so multi-agent cost is not invisible. Compute the count from the actual dispatch decision: 1 grounding-context agent (codebase scan in repo mode; user-context synthesis in elsewhere) + 1 learnings + 1 web researcher + 6 ideation = baseline 9. Add 1 if issue-tracker intent triggered (repo mode only). Add 1 if the user opted into Slack research. Subtract 1 if the user issued a web-research skip phrase or V15 reuse will fire.
 
 Examples (defaults, no skips, no opt-ins):
 
-- **Repo mode:** "Will dispatch ~9 agents: codebase scan + learnings + web-researcher + 6 ideation sub-agents. Skip phrases: 'no external research', 'no slack'."
-- **Elsewhere mode:** "Will dispatch ~9 agents: context synthesis + learnings + web-researcher + 6 ideation sub-agents. Skip phrases: 'no external research'."
+- **Repo mode:** "Will dispatch ~9 agents: codebase scan + learnings + web research + 6 ideation sub-agents. Skip phrases: 'no external research', 'no slack'."
+- **Elsewhere mode:** "Will dispatch ~9 agents: context synthesis + learnings + web research + 6 ideation sub-agents. Skip phrases: 'no external research'."
 
 The line is informational; users do not need to acknowledge it.
 
@@ -145,7 +145,7 @@ The line is informational; users do not need to acknowledge it.
 
 Before generating ideas, gather grounding. The dispatch set depends on the mode chosen in Phase 0.2; web research and learnings always run in both modes (skip phrases honored).
 
-Generate a `<run-id>` once at the start of Phase 1 (8 hex chars). Reuse it for the V15 cache file (this phase) and the V17 checkpoints (Phases 2 and 4) so cleanup is one directory remove on Phase 6 completion.
+Generate a `<run-id>` once at the start of Phase 1 (8 hex chars). Reuse it for the V15 cache file (this phase) and the V17 checkpoints (Phases 2 and 4) so they share one per-run scratch directory. The run directory is not deleted on Phase 6 completion — the V15 cache is session-scoped and reused across run-ids, and the checkpoints follow the repo's Scratch Space convention of leaving session-scoped artifacts for later invocations to use.
 
 Run grounding agents in parallel in the **foreground** (do not background — results are needed before Phase 2):
 
@@ -185,11 +185,11 @@ Issue intelligence does not apply in elsewhere mode. Slack research is opt-in fo
 
 #### Web Research (V5, V15)
 
-Always-on for both modes. Skip when the user said "no external research", "skip web research", or equivalent in their prompt or earlier answers; in that case, omit `web-researcher` from dispatch and note the skip in the consolidated grounding summary.
+Always-on for both modes. Skip when the user said "no external research", "skip web research", or equivalent in their prompt or earlier answers; in that case, omit `compound-engineering:research:web-researcher` from dispatch and note the skip in the consolidated grounding summary.
 
-Reuse prior web research within a session via a sidecar cache — see `references/web-research-cache.md` for the cache file shape, reuse check, append behavior, and platform-degradation rules. Read it the first time `web-researcher` would be dispatched in this run (and on every subsequent dispatch where the cache might apply).
+Reuse prior web research within a session via a sidecar cache — see `references/web-research-cache.md` for the cache file shape, reuse check, append behavior, and platform-degradation rules. Read it the first time `compound-engineering:research:web-researcher` would be dispatched in this run (and on every subsequent dispatch where the cache might apply).
 
-When dispatching `web-researcher`, pass: the focus hint, a brief planning context summary (one or two sentences), and the mode. Do not pass codebase content — the agent operates externally.
+When dispatching `compound-engineering:research:web-researcher`, pass: the focus hint, a brief planning context summary (one or two sentences), and the mode. Do not pass codebase content — the agent operates externally.
 
 #### Consolidated Grounding Summary
 
@@ -201,7 +201,7 @@ Consolidate all dispatched results into a short grounding summary using these se
 - **External context** *(when web research ran)* — prior art, adjacent solutions, market signals, cross-domain analogies. Note "(reused from earlier dispatch)" when V15 reuse fired
 - **Slack context** *(when present)* — organizational context
 
-**Failure handling.** Grounding agent failures follow "warn and proceed" — never block on grounding failure. If `web-researcher` fails (network, tool unavailable), log a warning ("External research unavailable: {reason}. Proceeding with internal grounding only.") and continue. If elsewhere-mode intake produced no usable context, note in the grounding summary that context is thin so Phase 2 sub-agents can compensate with broader generation.
+**Failure handling.** Grounding agent failures follow "warn and proceed" — never block on grounding failure. If `compound-engineering:research:web-researcher` fails (network, tool unavailable), log a warning ("External research unavailable: {reason}. Proceeding with internal grounding only.") and continue. If elsewhere-mode intake produced no usable context, note in the grounding summary that context is thin so Phase 2 sub-agents can compensate with broader generation.
 
 **Slack context** (opt-in, both modes) — never auto-dispatch. When the user asks for Slack context and Slack tools are available (look for any `slack-researcher` agent or `slack` MCP tools in the current environment), dispatch `compound-engineering:research:slack-researcher` with the focus hint in parallel with other Phase 1 agents. When tools are present but the user did not ask, mention availability in the grounding summary so they can opt in. When the user asked but no Slack tools are reachable, surface the install hint instead.
 
@@ -235,6 +235,6 @@ After all sub-agents return:
 3. If a focus was provided, weight the merged list toward it without excluding stronger adjacent ideas.
 4. Spread ideas across multiple dimensions when justified: workflow/DX, reliability, extensibility, missing capabilities, docs/knowledge compounding, quality/maintenance, leverage on future work.
 
-**Checkpoint A (V17).** Immediately after the cross-cutting synthesis step completes and the raw candidate list is consolidated, write `.context/compound-engineering/ce-ideate/<run-id>/raw-candidates.md` containing the full candidate list with sub-agent attribution. This protects the most expensive output (6 parallel sub-agent dispatches + dedupe) before Phase 3 critique potentially compacts context. Best-effort: if the write fails (disk full, permissions), log a warning and proceed; the checkpoint is not load-bearing. Cleaned up on Phase 6 completion (any path) along with the V15 cache file and Checkpoint B. If `.context/` namespacing is unavailable, fall back to OS temp (`mktemp -d`) per the repo Scratch Space convention.
+**Checkpoint A (V17).** Immediately after the cross-cutting synthesis step completes and the raw candidate list is consolidated, write `.context/compound-engineering/ce-ideate/<run-id>/raw-candidates.md` containing the full candidate list with sub-agent attribution. This protects the most expensive output (6 parallel sub-agent dispatches + dedupe) before Phase 3 critique potentially compacts context. Best-effort: if the write fails (disk full, permissions), log a warning and proceed; the checkpoint is not load-bearing. Not cleaned up at the end of the run (the run directory is preserved so the V15 cache remains reusable across run-ids in the same session — see Phase 6). If `.context/` namespacing is unavailable, fall back to OS temp (`mktemp -d`) per the repo Scratch Space convention.
 
 After merging and synthesis, read `references/post-ideation-workflow.md` for the adversarial filtering rubric, presentation format, artifact template, handoff options, and quality bar. Do not load this file before Phase 2 agent dispatch completes.

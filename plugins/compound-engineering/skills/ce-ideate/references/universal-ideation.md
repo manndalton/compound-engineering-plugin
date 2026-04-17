@@ -1,6 +1,6 @@
 # Universal Ideation Facilitator
 
-This file is loaded when ce:ideate detects an elsewhere-mode topic outside software (creative, business, personal, design, narrative, naming). It replaces the software ideation phases — do not run Phase 1 codebase scan or Phase 2 software-flavored frame dispatch. Instead, absorb these principles and facilitate ideation in the topic's native domain.
+This file is loaded when ce:ideate detects an elsewhere-mode topic outside software (creative, business, personal, design, narrative, naming). Phase 1 Elsewhere-mode grounding (user-context synthesis + learnings + web-research, skip phrases honored) still runs before this reference takes over — those dispatches are mode-symmetric and feed the facilitation below. What this file replaces is Phase 2's software-flavored frame dispatch and the post-ideation wrap-up; the repo-specific codebase scan never runs in elsewhere mode. Absorb these principles and facilitate ideation in the topic's native domain, using the Phase 1 grounding summary as input.
 
 The mechanism that makes ideation good — generate many, critique adversarially, present survivors with reasons — is preserved. Only the framing of the work changes.
 
