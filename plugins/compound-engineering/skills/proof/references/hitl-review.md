@@ -14,8 +14,9 @@ Inputs:
 
 - **Source file path** (required): absolute or repo-relative path to the local markdown file. When an upstream caller invokes this mode, it passes the path explicitly. When the user invokes directly ("share that doc to proof and let's iterate"), derive the path from conversation context — the file the user just referenced, created, or edited. If ambiguous, ask the user which file.
 - **Doc title** (required): display title for the Proof doc. Upstream callers pass this explicitly; on direct-user invocation, default to the file's H1 heading, falling back to the filename (minus extension) if no H1 exists.
-- **Identity** (optional, default `ai:compound-engineering` / `Compound Engineering`): agent ID and display name.
 - **Recommended next step** (optional, caller-specific): short string the caller wants echoed in the final terminal output (e.g., "Recommended next: `/ce:plan`"). Not used on direct-user invocation — the terminal report simply summarizes the iteration and asks what's next.
+
+Agent identity is fixed, not a parameter: every API call uses agent ID `ai:compound-engineering` and display name `Compound Engineering`. Callers do not override this.
 
 Return shape (used by upstream callers to resume their handoff; also shown to the user in the terminal when invoked directly):
 
@@ -41,16 +42,15 @@ Return shape (used by upstream callers to resume their handoff; also shown to th
 
 5. Ask the user with the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the options in chat and wait for the reply.
 
-   **Question:** "Review the doc in Proof. Highlight and comment to give feedback. What's next?"
+   **Question:** "Highlight text in Proof to leave a comment. The agent will read each one, reply in-thread or apply the fix, then sync changes back to your local file. What's next?"
 
    **Options:**
    - **I'm done with feedback — read it and apply**
    - **I have no feedback — proceed**
-   - **Keep working, I'll come back** (re-asks after the user says they are back)
+
+   If the user is still reviewing, they leave the prompt open — the blocking question waits naturally. A third "still working" option would be a no-op wrapper for that.
 
    On **I have no feedback — proceed**: skip to Phase 5 (end-sync); return to caller with `status: proceeded`.
-
-   On **Keep working**: wait for the user to say they are back, then re-ask the same question.
 
    On **I'm done with feedback**: continue to Phase 2.
 
@@ -118,6 +118,7 @@ Use `kind: "insert" | "delete" | "replace"` as appropriate; all three support `s
 - **Atomicity is required** — multiple coordinated edits must commit together or not at all (e.g., insert new section + update a reference in another block + delete the obsolete paragraph). `/edit/v2` takes an `operations` array that commits atomically; separate `suggestion.add` calls can partially succeed.
 - **Pre-user self-correction** — the agent is fixing its own output *before* the user has looked at the doc (e.g., spotted a mistake mid-ingest-pass). A tracked mark would imply "there was an old version," which is misleading from the user's perspective.
 - **Pure structural insertion with no quote anchor** — adding an entirely new block/section where no existing text serves as an anchor. `suggestion.add` requires a `quote`; `/edit/v2` has `insert_before` / `insert_after` keyed on block `ref`.
+- **Structural list-item or block removal** — `suggestion.add` with `kind: "delete"` only deletes the text inside a list item; the bullet marker (`*`, `-`, or numeric `1.`) stays behind as an orphan line. Use `/edit/v2 delete_block` to remove an entire block, or `find_replace_in_block` to splice out the item plus its surrounding whitespace cleanly.
 
 ```bash
 # Get snapshot for block refs + baseToken
@@ -130,6 +131,18 @@ curl -X POST "https://www.proofeditor.ai/api/agent/{slug}/edit/v2" \
 ```
 
 Supported `op` kinds: `replace_block`, `insert_before`, `insert_after`, `delete_block`, `replace_range` (`fromRef`+`toRef`), `find_replace_in_block` (`occurrence: "first"|"all"`).
+
+Op body shapes (block content must be wrapped in `block: {markdown}` — the server rejects flat `{op, ref, markdown}` shapes):
+
+```json
+{"op":"replace_block","ref":"b8","block":{"markdown":"new content"}}
+{"op":"insert_after","ref":"b3","block":{"markdown":"new block"}}
+{"op":"delete_block","ref":"b6"}
+{"op":"find_replace_in_block","ref":"b4","find":"old","replace":"new","occurrence":"first"}
+{"op":"replace_range","fromRef":"b2","toRef":"b5","block":{"markdown":"..."}}
+```
+
+Block `ref` values drift across revisions — always re-fetch `/snapshot` for fresh refs before each `/edit/v2` call.
 
 **Use pending `suggestion.add` (no status)** when the change is judgment-sensitive enough that the agent wants explicit user approval before commit — rare in HITL, since the point of auto-applied edits is to reduce round-trips. Most judgment-sensitive cases are better handled by leaving the thread open with a clarifying question.
 
@@ -171,13 +184,20 @@ Phrase them in whatever voice matches the situation rather than matching a templ
 
 Ask the user with the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the options in chat and wait for the reply.
 
-Offer options that cover these intents — phrase them naturally for the current state, and only include the ones that fit:
+**Question:** "Proof review pass done. What's next?"
 
-- **Wait** — user stays in Proof to respond; re-ingest when they say they're back (loops to Phase 2)
-- **Discuss in terminal** — talk through open threads here; the agent echoes decisions back to Proof threads. Only useful when escalations are open
-- **Proceed** — go to Phase 5 end-sync. If escalations are still open, name that in the option label (e.g., "Proceed with 3 threads still open") so the user is accepting the tradeoff explicitly instead of via a nested confirm
-- **Another pass** — re-read state and re-ingest. Worth offering even after a clean pass, since the user may have added comments while the report rendered
-- **Done for now** — stop without syncing; return to caller with `status: done_for_now`, no end-sync
+Offer options that cover these intents — use concrete user-facing labels, not agent-internal jargon (no "end-sync", "ingest pass", etc.). Only include the options that fit the current state. Some blocking-question tools cap at 4 visible options (e.g., `AskUserQuestion`), so pick the most useful subset rather than listing all five. Keep the `[short label] — [description]` shape consistent across every option to avoid a mixed-voice menu.
+
+- **Wait** → `Wait — I'll add more comments in Proof`
+  User stays in Proof to respond; re-ingest when they say they're back (loops to Phase 2).
+- **Discuss in terminal** → `Discuss — walk through the open threads in terminal`
+  Talk through open threads in the terminal; the agent echoes decisions back to Proof threads. Only useful when escalations are open.
+- **Proceed** → `I'm done — save the reviewed doc back to my local file`
+  Go to Phase 5 end-sync. If escalations are still open, name that in the label (e.g., `Save with 3 threads still open`) so the user is accepting the tradeoff explicitly instead of via a nested confirm.
+- **Another pass** → `Re-check — look for new comments in Proof`
+  Re-read state and re-ingest. Worth offering even after a clean pass, since the user may have added comments while the report rendered.
+- **Done for now** → `Pause — don't save yet, I'll come back`
+  Stop without syncing; return to caller with `status: done_for_now`, no end-sync.
 
 The sync confirmation happens in Phase 5 regardless of whether threads are open — this step only asks what the user wants next, not whether to overwrite the local file.
 
@@ -276,6 +296,10 @@ mutate() {
 ```
 
 On `STALE_BASE` in the response, re-run — the state read picks up the fresh token automatically.
+
+### jq gotcha when inspecting responses
+
+When extracting fields from API responses with jq's `//` alternative operator, parenthesize inside object constructors — jq parses `{markId: .markId // .result.markId}` as a syntax error. Use `{markId: (.markId // .result.markId)}`, or pull the value outside the object: `jq -r '.markId // .result.markId'`.
 
 ### Identity
 

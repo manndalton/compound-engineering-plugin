@@ -38,7 +38,7 @@ After document-review completes, present the options using the platform's blocki
 **Options:**
 1. **Start `/ce:work`** (recommended) - Begin implementing this plan in the current session
 2. **Create Issue** - Create a tracked issue from this plan in your configured issue tracker (GitHub or Linear)
-3. **Open in Proof** - Review the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others
+3. **Open in Proof (web app) — review and comment to iterate with the agent** - Open the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others
 4. **Done for now** - Pause; the plan file is saved and can be resumed later
 
 **Surface additional document review contextually, not as a menu fixture:** When the prior document-review pass surfaced residual P0/P1 findings that the user has not addressed, mention them adjacent to the menu and offer another review pass in prose (e.g., "Document review flagged 2 P1 findings you may want to address — want me to run another pass before you pick?"). Do not add it to the option list.
@@ -46,7 +46,7 @@ After document-review completes, present the options using the platform's blocki
 Based on selection:
 - **Start `/ce:work`** -> Call `/ce:work` with the plan path
 - **Create Issue** -> Follow the Issue Creation section below
-- **Open in Proof** -> Load the `proof` skill in HITL-review mode with:
+- **Open in Proof (web app) — review and comment to iterate with the agent** -> Load the `proof` skill in HITL-review mode with:
   - source file: `docs/plans/<plan_filename>.md`
   - doc title: `Plan: <plan title from frontmatter>`
   - identity: `ai:compound-engineering` / `Compound Engineering`

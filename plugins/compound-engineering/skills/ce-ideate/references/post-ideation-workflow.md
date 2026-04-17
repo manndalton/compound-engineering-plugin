@@ -104,13 +104,15 @@ If resuming:
 
 ## Phase 6: Refine or Hand Off
 
-After presenting the results, ask what should happen next.
+After presenting the results, ask what should happen next using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present the numbered options in chat and wait for the user's reply before proceeding.
+
+**Question:** "Ideation saved. What's next?"
 
 Offer these options:
-1. brainstorm a selected idea
-2. refine the ideation
-3. Open in Proof — review the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others
-4. end the session
+1. **Brainstorm a selected idea** — hand off to `ce:brainstorm` with the selected idea as the seed
+2. **Refine the ideation** — add, re-evaluate, or deepen ideas before handing off
+3. **Open in Proof (web app) — review and comment to iterate with the agent** — open the doc in Every's Proof editor, iterate via comments, or copy a link to share with others
+4. **End the session** — no further action; the ideation doc is saved
 
 ### 6.1 Brainstorm a Selected Idea
 
@@ -132,7 +134,7 @@ Route refinement by intent:
 After each refinement:
 - update the ideation document before any handoff, sharing, or session end
 
-### 6.3 Open in Proof
+### 6.3 Open in Proof (web app)
 
 If requested, hand off the ideation document to the proof skill in HITL review mode. This uploads the doc, runs an iterative review loop (user annotates in Proof, agent ingests feedback and applies tracked edits), and syncs the reviewed markdown back to `docs/ideation/`.
 

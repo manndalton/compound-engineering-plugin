@@ -23,7 +23,7 @@ Present only the options that apply, keeping the total at 4 or fewer:
 - **Proceed to planning (Recommended)** - Move to `/ce:plan` for structured implementation planning. Shown only when `Resolve Before Planning` is empty.
 - **Proceed directly to work** - Skip planning and move to `/ce:work`; suited to lightweight, well-defined changes. Shown only when `Resolve Before Planning` is empty **and** scope is lightweight, success criteria are clear, scope boundaries are clear, and no meaningful technical or research questions remain (the "direct-to-work gate").
 - **Continue the brainstorm** - Answer more clarifying questions to tighten scope, edge cases, and preferences. Always shown.
-- **Open in Proof** - Review the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others. Shown only when a requirements document exists **and** the direct-to-work gate is not satisfied (when both conditions collide, `Proceed directly to work` takes priority and Proof becomes reachable via free-form request).
+- **Open in Proof (web app) — review and comment to iterate with the agent** - Open the doc in Every's Proof editor, iterate with the agent via comments, or copy a link to share with others. Shown only when a requirements document exists **and** the direct-to-work gate is not satisfied (when both conditions collide, `Proceed directly to work` takes priority and Proof becomes reachable via free-form request).
 - **Done for now** - Pause; the requirements doc is saved and can be resumed later. Always shown.
 
 **Surface additional document review contextually, not as a menu fixture:** When the prior document-review pass surfaced residual P0/P1 findings that the user has not addressed, mention them adjacent to the menu and offer another review pass in prose (e.g., "Document review flagged 2 P1 findings you may want to address — want me to run another pass?"). Do not add it to the option list.
@@ -40,7 +40,7 @@ Immediately run `/ce:work` in the current session using the finalized brainstorm
 
 **If user selects "Continue the brainstorm":** Return to Phase 1.3 (Collaborative Dialogue) and continue asking the user clarifying questions one at a time to further refine scope, edge cases, constraints, and preferences. Continue until the user is satisfied, then return to Phase 4. Do not show the closing summary yet.
 
-**If user selects "Open in Proof":**
+**If user selects "Open in Proof (web app) — review and comment to iterate with the agent":**
 
 Load the `proof` skill in HITL-review mode with:
 
