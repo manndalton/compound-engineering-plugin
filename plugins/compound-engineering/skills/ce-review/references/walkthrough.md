@@ -18,54 +18,133 @@ Each finding's recommended action has already been normalized by Stage 5 (step 7
 
 ---
 
-## Per-finding question format
+## Per-finding presentation
 
-For each finding, the walk-through asks the user via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini).
+Each finding is presented in two parts: a **terminal output block** carrying the explanation, and a **question** via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini) carrying the decision. Never merge the two — the terminal block uses markdown; the question uses plain text.
 
-### Stem
+In Claude Code the tool should already be loaded from the Interactive-mode pre-load step in `SKILL.md` — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. Rendering the per-finding question as narrative text is a bug, not a valid fallback.
 
-Opens with a mode + position indicator, then the persona-produced framing, then the proposed fix and reasoning.
+### Terminal output block (print before firing the question)
+
+Render as markdown. Labels on their own line, blank lines between sections:
 
 ```
-Review mode — Finding 3 of 8 (P1):
+## Finding {N} of {M} — {severity} {plain-English title}
 
-<plain-English problem statement from why_it_matters>
+{file}:{line}
 
-Proposed fix:
-  <suggested_fix, as a code block when it is a diff or literal change>
+**What's wrong**
 
-<R15 conflict context line, when applicable>
+{plain-English problem statement from why_it_matters}
+
+**Proposed fix**
+
+{suggested_fix, as a code block when it is a diff or literal change}
+
+**Why it works**
+
+{short reasoning, grounded in a codebase pattern when available}
+
+{R15 conflict context line, when applicable}
 ```
 
 Substitutions:
 
+- **`{plain-English title}`:** a 3-8 word summary suitable as a heading. Derived from the merged finding's `title` field but rephrased so it reads as observable behavior (e.g., "Path traversal in loadUserFromCache" rather than "Missing userId validation on line 36").
 - **`why_it_matters`:** read the contributing reviewer's artifact file at `.context/compound-engineering/ce-review/{run_id}/{reviewer_name}.json` using the same `file + line_bucket(line, +/-3) + normalize(title)` matching that headless mode uses (see `SKILL.md` Stage 6 detail enrichment). When multiple reviewers flagged the merged finding, try them in the order they appear in the merged finding's reviewer list. Use the first match.
-- **`suggested_fix`:** taken from the merged finding's `suggested_fix` field (merge-tier; always available without artifact lookup when set).
+- **`suggested_fix`:** from the merged finding's `suggested_fix` field. Render as prose describing **intent**, not as syntax. The fixer subagent owns the exact code — the walk-through just needs enough for the user to trust or reject the action. Rules:
+  - **Default — one sentence describing the effect.** What does the fix achieve, and where does it live? Prefer intent language over quoted code.
+    - ✅ `Throw on non-2xx response before parsing JSON.`
+    - ✅ `` Replace `==` with `===` on line 42. ``
+    - ✅ `` Add a `response.ok` check after the fetch and throw on non-2xx. ``
+    - ✅ `Extract the request-building logic into a helper and call it from both sites.`
+    - ❌ `` Add `if (!response.ok) throw new Error(`HTTP ${response.status}`);` after the `await fetch(...)` call, before `response.json()`. `` — nested backticks, multiple code spans, full statement quoted; renders broken in terminal.
+  - **Code-span budget: at most 2 inline backtick spans per sentence, each a single identifier, operator, or short phrase** (e.g., `` `response.ok` ``, `` `===` ``, `` `fetchUserById` ``). Never embed full statements, template literals, or code requiring nested backticks. If the intent can't be stated within that budget, the prose is too close to syntax — restate at a higher level, or switch to summary + artifact pointer.
+  - **Always leave a space before and after every backtick span.** Without it, the terminal's markdown renderer eats the delimiters and runs the words together.
+  - **Raw code block — only for short (≤5 line) genuinely additive new code** where no before-state exists (new file, new function, new guard at the top of an empty body). Above 5 lines, switch to summary + pointer.
+  - **Summary + artifact pointer** — when prose can't capture the fix: one-sentence transformation + key symbol/location + `Full fix: .context/compound-engineering/ce-review/{run_id}/{reviewer_name}.json → findings[].suggested_fix`.
+  - **No diff blocks.** Modifications to existing code render as prose.
+- **`Why it works`:** grounded reasoning that, where possible, references a similar pattern already used elsewhere in the codebase (e.g., "matches the format-validation pattern already used at src/cli/io.ts:41"). One to three sentences.
 - **R15 conflict context line (when applicable):** when contributing reviewers implied different actions for this finding and Stage 5 step 7b broke the tie, surface that briefly. Example: `Correctness recommends Apply; Testing recommends Skip (low confidence). Agent's recommendation: Skip.` The orchestrator's recommendation — the post-tie-break value — is what the menu labels "recommended."
 
-When no artifact match exists for the finding (merge-synthesized finding, or the persona's artifact write failed), the walk-through degrades to the finding's title plus `suggested_fix` only and records the gap for the Coverage section of the completion report.
+When no artifact match exists for the finding (merge-synthesized finding, or the persona's artifact write failed), the terminal block degrades to the heading + `suggested_fix` only (omit the `What's wrong` and `Why it works` sections) and records the gap for the Coverage section of the completion report.
+
+### Question stem (short, decision-focused)
+
+After the terminal block renders, fire the platform's blocking question tool with a compact two-line stem:
+
+```
+Finding {N} of {M} — {severity} {short handle}.
+{Action framing in a phrase}?
+```
+
+Where:
+
+- **Short handle:** matches the `{plain-English title}` from the terminal block heading.
+- **Action framing:** one phrase describing what the *single recommended action* does, as a yes/no question. Examples: `Apply the format-validation + path.resolve guard?`, `Skip the fix since the fixture is being deleted?`, `Defer and file a rotation ticket?`.
+
+Never enumerate alternatives in the stem. One recommendation as a yes/no — the option list carries the alternatives. When the recommendation is close, surface the disagreement in the R15 conflict context line, not as a multi-option stem.
+
+Example (recommendation = Apply):
+
+```
+Finding 3 of 8 — P1 path traversal in loadUserFromCache.
+Apply the format-validation + path.resolve guard?
+```
+
+Example (recommendation = Skip because content context overrides default):
+
+```
+Finding 1 of 9 — P0 hardcoded admin token.
+Skip the fix since the fixture is being deleted?
+(Security recommends Apply; file context recommends Skip. Agent's recommendation: Skip.)
+```
+
+Never embed code blocks, diff syntax, or the full fix/reasoning in the stem.
+
+### Confirmation between findings
+
+After the user answers and before printing the next finding's terminal block, emit a one-line confirmation of the action taken. Examples: `→ Applied. Fix staged at src/utils/api-client.ts:36-37.`, `→ Deferred. Ticket filed: <url>.`, `→ Skipped.`, `→ Acknowledged.`
 
 ### Options (four, or adapted as noted)
 
+Fixed order. Never reorder:
+
 ```
-Apply the proposed fix
-Defer — file a [TRACKER] ticket
-Skip — don't apply, don't track
-LFG the rest — apply the agent's best judgment to this and remaining findings
+1. Apply the proposed fix
+2. Defer — file a [TRACKER] ticket
+3. Skip — don't apply, don't track
+4. LFG the rest — apply the agent's best judgment to this and remaining findings
 ```
 
-Render the `[TRACKER]` label per the label logic in `tracker-defer.md`: when `confidence = high` AND `named_sink_available = true`, replace `[TRACKER]` with the concrete tracker name (e.g., `Defer — file a Linear ticket`). When `any_sink_available = true` but either `confidence = low` or `named_sink_available = false`, use the generic whole label `Defer — file a ticket` — this is a whole-label substitution, not a `[TRACKER]` token swap.
+Render the `[TRACKER]` label per `tracker-defer.md`: when `confidence = high` AND `named_sink_available = true`, replace `[TRACKER]` with the concrete tracker name (e.g., `Defer — file a Linear ticket`). When `any_sink_available = true` but either `confidence = low` or `named_sink_available = false`, use the generic whole label `Defer — file a ticket` — whole-label substitution, not a `[TRACKER]` token swap.
 
-The menu's "recommended" option reflects the orchestrator's per-finding recommended action (post-tie-break). The question stem may label it `(recommended)` on the appropriate option label; alternately the recommendation can be surfaced in the stem's R15 conflict context line when multiple reviewers disagreed.
+**Mark the post-tie-break recommendation with `(recommended)` on its option label.** Required, not optional. Any of the four options can carry it:
+
+```
+1. Apply the proposed fix  (recommended)
+2. Defer — file a ticket
+3. Skip — don't apply, don't track
+4. LFG the rest
+```
+
+```
+1. Apply the proposed fix
+2. Defer — file a ticket
+3. Skip — don't apply, don't track  (recommended)
+4. LFG the rest
+```
+
+When reviewers disagreed or content context cuts against the default, still mark one option — whichever Stage 5 step 7b produced — and surface the disagreement in the R15 conflict context line.
 
 ### Adaptations
 
 - **Advisory-only finding:** when the finding's `autofix_class` is `advisory` (no actionable fix), option A is replaced with `Acknowledge — mark as reviewed`. The other three options remain. The advisory variant is the only case where `Acknowledge` appears in the menu.
-- **N=1 (exactly one pending finding):** the stem wording shifts from `Finding N of M` to simply describing the single finding. Option D (`LFG the rest`) is suppressed because no subsequent findings exist — the menu shows three options: Apply / Defer / Skip (or Acknowledge, for advisory).
+- **N=1 (exactly one pending finding):** the terminal block's heading omits `Finding N of M` and renders as `## {severity} {plain-English title}`. The stem's first line drops the position counter, becoming `{severity} {short handle}.` Option D (`LFG the rest`) is suppressed because no subsequent findings exist — the menu shows three options: Apply / Defer / Skip (or Acknowledge, for advisory).
 - **No-sink (Defer option unavailable):** when the tracker-detection tuple reports `any_sink_available: false` (every tier in the fallback chain — named tracker, GitHub Issues, harness primitive — is unreachable), option B (`Defer`) is omitted. The stem appends one line explaining why (e.g., `Defer unavailable on this platform — no tracker or task-tracking primitive detected.`). The menu shows three options: Apply / Skip / LFG the rest (and Acknowledge in place of Apply for advisory-only findings).
 - **Combined N=1 + no-sink:** the menu shows two options: Apply / Skip (or Acknowledge / Skip).
 
-When no blocking question tool is available on the platform, present the options as a numbered list and wait for the user's next reply.
+Only when `ToolSearch` explicitly returns no match or the tool call errors — or on a platform with no blocking question tool — fall back to presenting the options as a numbered list and waiting for the user's next reply.
 
 ---
 

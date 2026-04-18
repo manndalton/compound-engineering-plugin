@@ -66,7 +66,7 @@ Never fall back to `.context/compound-engineering/todos/`. The internal-todos sy
 
 ## Once-per-session harness-fallback confirmation
 
-When the fallback to harness task-tracking primitive is in effect, and before the first Defer action of the session executes, the agent asks the user once using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini):
+When the fallback to harness task-tracking primitive is in effect, and before the first Defer action of the session executes, the agent asks the user once using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). In Claude Code, `AskUserQuestion` is a deferred tool — before the first call this session, load its schema via `ToolSearch` with query `select:AskUserQuestion`.
 
 > No documented tracker was found and `gh` is not available. Defer actions will create in-session tasks that do not survive past this session. Proceed for this and subsequent Defer actions?
 
@@ -76,7 +76,7 @@ Options:
 
 The confirmation is cached for the session. Subsequent Defer actions do not re-prompt.
 
-When no blocking question tool is available, the agent presents numbered options and waits for the user's reply.
+Only when `ToolSearch` explicitly returns no match or the tool call errors — or on a platform with no blocking question tool — fall back to numbered options and waiting for the user's reply.
 
 ---
 
@@ -111,7 +111,7 @@ Options:
 
 When a high-confidence named tracker fails at execution, the cached `named_sink_available` is set to `false` for the rest of the session. Subsequent Defer actions fall straight through to the next tier without retrying a confirmed-broken sink. `any_sink_available` is only downgraded to `false` when every tier has been confirmed broken — a failed Linear call that succeeds via `gh` keeps `any_sink_available = true`.
 
-When no blocking question tool is available, the agent presents numbered options and waits for the user's reply.
+Only when `ToolSearch` explicitly returns no match or the tool call errors — or on a platform with no blocking question tool — fall back to numbered options and waiting for the user's reply.
 
 ---
 
@@ -133,6 +133,6 @@ When uncertain, prefer "drop with explicit user-facing notice" over "pass throug
 
 ## Cross-platform notes
 
-The question-tool name varies by platform. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). When no blocking tool is available, present numbered options and wait for the user's next reply before proceeding.
+The question-tool name varies by platform. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). In Claude Code the tool should already be loaded from the Interactive-mode pre-load step — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. Only when that load explicitly fails, or on a platform with no blocking tool, fall back to numbered options and waiting for the user's next reply before proceeding.
 
 The fallback chain's final tier (harness task-tracking primitive) does not exist on every target platform. When converted for a platform that has no equivalent of `TaskCreate` / `update_plan`, the agent should treat that platform as "no harness sink" and move directly to the no-sink behavior (omit Defer from menus and tell the user why).

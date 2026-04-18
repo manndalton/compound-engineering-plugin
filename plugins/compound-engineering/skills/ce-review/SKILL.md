@@ -70,6 +70,11 @@ All tokens are optional. Each one present means one less thing to infer. When ab
 - **Never commit, push, or create a PR** from headless mode. The caller owns those decisions.
 - **End with "Review complete" as the terminal signal** so callers can detect completion. If all reviewers fail or time out, emit `Code review degraded (headless mode). Reason: 0 of N reviewers returned results.` followed by "Review complete".
 
+### Interactive mode rules
+
+- **Pre-load the platform question tool before any question fires.** In Claude Code, `AskUserQuestion` is a deferred tool — its schema is not available at session start. At the start of Interactive-mode work (before Stage 2 intent-ambiguity questions, the After-Review routing question, walk-through per-finding questions, bulk-preview Proceed/Cancel, and tracker-defer failure sub-questions), call `ToolSearch` with query `select:AskUserQuestion` to load the schema. Load it **once, eagerly, at the top of the Interactive flow** — do not wait for the first question site and do not decide it on a per-site basis. On Codex (`request_user_input`) and Gemini (`ask_user`) this step is not required; the tools are loaded by default.
+- **The numbered-list fallback only applies on confirmed load failure.** The skill's fallback pattern — "present the options as a numbered list and wait for the user's reply" — is valid **only** when `ToolSearch` returns no match or the tool call explicitly fails. Rendering a question as narrative text because the tool feels inconvenient, because the model is in report-formatting mode, or because the instruction was buried in a long skill is a bug. A question that calls for a user decision must either fire the tool or fail loudly.
+
 ## Severity Scale
 
 All reviewers use P0-P3:
@@ -316,7 +321,7 @@ Pass this to every reviewer in their spawn prompt. Intent shapes *how hard each 
 
 **When intent is ambiguous:**
 
-- **Interactive mode:** Ask one question using the platform's interactive question tool (AskUserQuestion in Claude Code, request_user_input in Codex): "What is the primary goal of these changes?" Do not spawn reviewers until intent is established.
+- **Interactive mode:** If `AskUserQuestion` has not yet been loaded this session (per the Interactive mode rules pre-load), call `ToolSearch` with query `select:AskUserQuestion` first. Then ask one question using the platform's interactive question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex): "What is the primary goal of these changes?" Do not spawn reviewers until intent is established.
 - **Autofix/report-only/headless modes:** Infer intent conservatively from the branch name, diff, PR metadata, and caller context. Note the uncertainty in Coverage or Verdict reasoning instead of blocking.
 
 ### Stage 2b: Plan discovery (requirements verification)
@@ -620,6 +625,7 @@ After presenting findings and verdict (Stage 6), route the next steps by mode. R
 - Apply `safe_auto -> review-fixer` findings automatically without asking. These are safe by definition.
 - **Zero-remaining case:** if no `gated_auto` or `manual` findings remain after the `safe_auto` pass, skip the routing question entirely. Emit a one-line completion summary (e.g., `All findings resolved — N safe_auto fixes applied.`) followed by the existing end-of-review verdict, then proceed to Step 5 per the gating rule there.
 - **Tracker pre-detection:** before rendering the routing question, consult `references/tracker-defer.md` for the session's tracker tuple `{ tracker_name, confidence, named_sink_available, any_sink_available }`. The probe runs at most once per session and is cached for the rest of the run. `named_sink_available` drives the option C label (inline tracker name only when the named sink can actually be invoked). `any_sink_available` drives whether option C is offered at all (it can still be offered when the named tracker is unreachable but `gh` or the harness task primitive works).
+- **Verify question-tool pre-load (checklist).** Before firing the routing question, confirm `AskUserQuestion` is loaded (per Interactive mode rules at the top of this skill). If not yet loaded this session, call `ToolSearch` with query `select:AskUserQuestion` now. Do not proceed to the routing question without this verification. Rendering the question as narrative text is a bug, not a valid fallback.
 - **Routing question.** Ask using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). Stem: `What should the agent do with the remaining N findings?` — third-person voice per `plugins/compound-engineering/AGENTS.md:127`. Options:
 
   ```
@@ -631,7 +637,7 @@ After presenting findings and verdict (Stage 6), route the next steps by mode. R
 
   Render option C per `references/tracker-defer.md`: when `confidence = high` AND `named_sink_available = true`, replace `[TRACKER]` with the concrete name and keep the full label (e.g., `File a Linear ticket per finding without applying fixes`). When `any_sink_available = true` but either `confidence = low` or `named_sink_available = false` (a fallback tier like GitHub Issues or the harness task primitive is working instead), use the generic label `File an issue per finding without applying fixes` — this is a whole-label substitution, not a `[TRACKER]` token swap. When `any_sink_available = false`, **omit option C entirely** and add one line to the stem explaining why (e.g., `Defer unavailable — no tracker or task-tracking primitive detected on this platform.`). The three remaining options (A, B, D) survive.
 
-  When no blocking question tool is available, present the applicable options as a numbered list and wait for the user's reply.
+  The numbered-list text fallback applies only when `ToolSearch` explicitly returns no match for the platform's question tool or the tool call errors. It does not apply when the agent simply hasn't loaded the tool yet — in that case, load it now (see the verification checklist above). On platforms genuinely without a blocking question tool, present the applicable options as a numbered list and wait for the user's reply.
 
 - **Dispatch on selection:**
   - (A) `Review each finding one by one` — load `references/walkthrough.md` and enter the per-finding walk-through loop. The walk-through accumulates Apply decisions in memory; Defer decisions execute inline via `references/tracker-defer.md`; Skip / Acknowledge decisions are recorded as no-action; `LFG the rest` routes through `references/bulk-preview.md`. At end of the loop, dispatch one fixer subagent for the accumulated Apply set (Step 3). Emit the unified completion report.

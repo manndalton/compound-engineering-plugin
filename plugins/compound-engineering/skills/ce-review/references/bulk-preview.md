@@ -86,7 +86,7 @@ When no `why_it_matters` is available for a finding (e.g., Unit 2's template upg
 
 ## Question and options
 
-After the preview body is rendered, ask the user using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini):
+After the preview body is rendered, ask the user using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). In Claude Code, the tool should already be loaded from the Interactive-mode pre-load step — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. The text fallback below applies only when that load explicitly fails.
 
 Stem (adapted to the path):
 - For routing B: `The agent is about to apply the plan above. Proceed?`
@@ -97,7 +97,7 @@ Options (exactly two, in all three cases):
 - `Proceed` — execute the plan as shown
 - `Cancel` — do nothing, return to the originating question
 
-When no blocking question tool is available, present numbered options and wait for the user's next reply.
+Only when `ToolSearch` explicitly returns no match or the tool call errors — or on a platform with no blocking question tool — fall back to presenting numbered options and waiting for the user's next reply.
 
 ---
 
