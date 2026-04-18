@@ -54,7 +54,7 @@ Skip — don't apply, don't track
 LFG the rest — apply the agent's best judgment to this and remaining findings
 ```
 
-The `[TRACKER]` placeholder is substituted per the label logic in `tracker-defer.md` — the concrete tracker name when detection confidence is high and the sink is available, otherwise a generic form (`File a ticket`).
+Render the `[TRACKER]` label per the label logic in `tracker-defer.md`: when `confidence = high` AND `named_sink_available = true`, replace `[TRACKER]` with the concrete tracker name (e.g., `Defer — file a Linear ticket`). When `any_sink_available = true` but either `confidence = low` or `named_sink_available = false`, use the generic whole label `Defer — file a ticket` — this is a whole-label substitution, not a `[TRACKER]` token swap.
 
 The menu's "recommended" option reflects the orchestrator's per-finding recommended action (post-tie-break). The question stem may label it `(recommended)` on the appropriate option label; alternately the recommendation can be surfaced in the stem's R15 conflict context line when multiple reviewers disagreed.
 
