@@ -108,7 +108,7 @@ describe("convertClaudeToCodex", () => {
     expect(parseFrontmatter(skill!.content).data.model).toBeUndefined()
   })
 
-  test("copies workflow skills as regular skills and omits workflows aliases", () => {
+  test("generates prompt wrappers for canonical ce workflow skills and omits workflows aliases", () => {
     const plugin: ClaudePlugin = {
       ...fixturePlugin,
       manifest: { name: "compound-engineering", version: "1.0.0" },
@@ -116,7 +116,7 @@ describe("convertClaudeToCodex", () => {
       agents: [],
       skills: [
         {
-          name: "ce-plan",
+          name: "ce:plan",
           description: "Planning workflow",
           argumentHint: "[feature]",
           sourceDir: "/tmp/plugin/skills/ce-plan",
@@ -138,11 +138,15 @@ describe("convertClaudeToCodex", () => {
       permissions: "none",
     })
 
-    // No prompt wrappers for workflow skills — they're directly invocable as skills
-    expect(bundle.prompts).toHaveLength(0)
+    expect(bundle.prompts).toHaveLength(1)
+    expect(bundle.prompts[0]?.name).toBe("ce-plan")
 
-    // ce-plan is copied as a regular skill, workflows:plan is omitted
-    expect(bundle.skillDirs.map((skill) => skill.name)).toEqual(["ce-plan"])
+    const parsedPrompt = parseFrontmatter(bundle.prompts[0]!.content)
+    expect(parsedPrompt.data.description).toBe("Planning workflow")
+    expect(parsedPrompt.data["argument-hint"]).toBe("[feature]")
+    expect(parsedPrompt.body).toContain("Use the ce:plan skill")
+
+    expect(bundle.skillDirs.map((skill) => skill.name)).toEqual(["ce:plan"])
   })
 
   test("does not apply compound workflow canonicalization to other plugins", () => {
@@ -153,7 +157,7 @@ describe("convertClaudeToCodex", () => {
       agents: [],
       skills: [
         {
-          name: "ce-plan",
+          name: "ce:plan",
           description: "Custom CE-namespaced skill",
           argumentHint: "[feature]",
           sourceDir: "/tmp/plugin/skills/ce-plan",
@@ -176,7 +180,7 @@ describe("convertClaudeToCodex", () => {
     })
 
     expect(bundle.prompts).toHaveLength(0)
-    expect(bundle.skillDirs.map((skill) => skill.name)).toEqual(["ce-plan", "workflows:plan"])
+    expect(bundle.skillDirs.map((skill) => skill.name)).toEqual(["ce:plan", "workflows:plan"])
   })
 
   test("passes through MCP servers", () => {
@@ -383,7 +387,7 @@ Don't confuse with file paths like /tmp/output.md or /dev/null.`,
     expect(parsed.body).not.toContain("<script-dir>/prompts:discover-sessions.sh")
   })
 
-  test("transforms workflow skill slash commands to Codex skill references", () => {
+  test("transforms canonical workflow slash commands to Codex prompt references", () => {
     const plugin: ClaudePlugin = {
       ...fixturePlugin,
       manifest: { name: "compound-engineering", version: "1.0.0" },
@@ -391,23 +395,23 @@ Don't confuse with file paths like /tmp/output.md or /dev/null.`,
         {
           name: "review",
           description: "Review command",
-          body: `After the brainstorm, run /ce-plan.
+          body: `After the brainstorm, run /ce:plan.
 
-If planning is complete, continue with /ce-work.`,
+If planning is complete, continue with /ce:work.`,
           sourcePath: "/tmp/plugin/commands/review.md",
         },
       ],
       agents: [],
       skills: [
         {
-          name: "ce-plan",
+          name: "ce:plan",
           description: "Planning workflow",
           argumentHint: "[feature]",
           sourceDir: "/tmp/plugin/skills/ce-plan",
           skillPath: "/tmp/plugin/skills/ce-plan/SKILL.md",
         },
         {
-          name: "ce-work",
+          name: "ce:work",
           description: "Implementation workflow",
           argumentHint: "[feature]",
           sourceDir: "/tmp/plugin/skills/ce-work",
@@ -433,9 +437,9 @@ If planning is complete, continue with /ce-work.`,
     expect(commandSkill).toBeDefined()
     const parsed = parseFrontmatter(commandSkill!.content)
 
-    // Workflow skills are now regular skills, so references use skill syntax
-    expect(parsed.body).toContain("the ce-plan skill")
-    expect(parsed.body).toContain("the ce-work skill")
+    expect(parsed.body).toContain("/prompts:ce-plan")
+    expect(parsed.body).toContain("/prompts:ce-work")
+    expect(parsed.body).not.toContain("the ce:plan skill")
   })
 
   test("excludes commands with disable-model-invocation from prompts and skills", () => {

@@ -21,6 +21,9 @@ export function convertClaudeToCodex(
   const platformSkills = filterSkillsByPlatform(plugin.skills, "codex")
   const invocableCommands = plugin.commands.filter((command) => !command.disableModelInvocation)
   const applyCompoundWorkflowModel = shouldApplyCompoundWorkflowModel(plugin)
+  const canonicalWorkflowSkills = applyCompoundWorkflowModel
+    ? platformSkills.filter((skill) => isCanonicalCodexWorkflowSkill(skill.name))
+    : []
   const deprecatedWorkflowAliases = applyCompoundWorkflowModel
     ? platformSkills.filter((skill) => isDeprecatedCodexWorkflowAlias(skill.name))
     : []
@@ -42,19 +45,33 @@ export function convertClaudeToCodex(
     )
   }
 
+  const workflowPromptNames = new Map<string, string>()
+  for (const skill of canonicalWorkflowSkills) {
+    workflowPromptNames.set(
+      skill.name,
+      uniqueName(normalizeCodexName(skill.name), promptNames),
+    )
+  }
+
   const promptTargets: Record<string, string> = {}
   for (const [commandName, promptName] of commandPromptNames) {
     promptTargets[normalizeCodexName(commandName)] = promptName
   }
-  const skillTargets: Record<string, string> = {}
-  for (const skill of copiedSkills) {
-    skillTargets[normalizeCodexName(skill.name)] = skill.name
+  for (const [skillName, promptName] of workflowPromptNames) {
+    promptTargets[normalizeCodexName(skillName)] = promptName
   }
   for (const alias of deprecatedWorkflowAliases) {
     const canonicalName = toCanonicalWorkflowSkillName(alias.name)
-    if (canonicalName) {
-      skillTargets[normalizeCodexName(alias.name)] = canonicalName
+    const promptName = canonicalName ? workflowPromptNames.get(canonicalName) : undefined
+    if (promptName) {
+      promptTargets[normalizeCodexName(alias.name)] = promptName
     }
+  }
+
+  const skillTargets: Record<string, string> = {}
+  for (const skill of copiedSkills) {
+    if (applyCompoundWorkflowModel && isCanonicalCodexWorkflowSkill(skill.name)) continue
+    skillTargets[normalizeCodexName(skill.name)] = skill.name
   }
 
   const invocationTargets: CodexInvocationTargets = { promptTargets, skillTargets }
@@ -67,6 +84,10 @@ export function convertClaudeToCodex(
     const content = renderPrompt(command, commandSkill.name, invocationTargets)
     return { name: promptName, content }
   })
+  const workflowPrompts = canonicalWorkflowSkills.map((skill) => ({
+    name: workflowPromptNames.get(skill.name)!,
+    content: renderWorkflowPrompt(skill),
+  }))
 
   const agentSkills = plugin.agents.map((agent) =>
     convertAgent(agent, usedSkillNames, invocationTargets),
@@ -74,7 +95,7 @@ export function convertClaudeToCodex(
   const generatedSkills = [...commandSkills, ...agentSkills]
 
   return {
-    prompts,
+    prompts: [...prompts, ...workflowPrompts],
     skillDirs,
     generatedSkills,
     invocationTargets,
@@ -147,17 +168,29 @@ function renderPrompt(
   return formatFrontmatter(frontmatter, body)
 }
 
+function renderWorkflowPrompt(skill: ClaudeSkill): string {
+  const frontmatter: Record<string, unknown> = {
+    description: skill.description,
+    "argument-hint": skill.argumentHint,
+  }
+  const body = [
+    `Use the ${skill.name} skill for this workflow and follow its instructions exactly.`,
+    "Treat any text after the prompt name as the workflow context to pass through.",
+  ].join("\n\n")
+  return formatFrontmatter(frontmatter, body)
+}
+
+function isCanonicalCodexWorkflowSkill(name: string): boolean {
+  return name.startsWith("ce:")
+}
+
 function isDeprecatedCodexWorkflowAlias(name: string): boolean {
   return name.startsWith("workflows:")
 }
 
-const WORKFLOW_ALIAS_OVERRIDES: Record<string, string> = {
-  "workflows:review": "ce-code-review",
-}
-
 function toCanonicalWorkflowSkillName(name: string): string | null {
   if (!isDeprecatedCodexWorkflowAlias(name)) return null
-  return WORKFLOW_ALIAS_OVERRIDES[name] ?? `ce-${name.slice("workflows:".length)}`
+  return `ce:${name.slice("workflows:".length)}`
 }
 
 function shouldApplyCompoundWorkflowModel(plugin: ClaudePlugin): boolean {

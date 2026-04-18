@@ -7,15 +7,8 @@ const pluginRoot = path.join(process.cwd(), "plugins", "compound-engineering")
 
 describe("sanitizePathName", () => {
   test("replaces colons with hyphens", () => {
-    expect(sanitizePathName("other:skill")).toBe("other-skill")
-    expect(sanitizePathName("other:tool")).toBe("other-tool")
-  })
-
-  test("no CE skill name contains a colon", async () => {
-    const plugin = await loadClaudePlugin(pluginRoot)
-    for (const skill of plugin.skills) {
-      expect(skill.name).not.toContain(":")
-    }
+    expect(sanitizePathName("ce:brainstorm")).toBe("ce-brainstorm")
+    expect(sanitizePathName("ce:plan")).toBe("ce-plan")
   })
 
   test("passes through names without colons", () => {
