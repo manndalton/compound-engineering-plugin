@@ -14,7 +14,7 @@ Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `re
 
 **Stem:** `What should the agent do with the remaining N findings?`
 
-**Options (fixed order; any of the four can carry `(recommended)` based on synthesis step 3.6):**
+**Options (fixed order; no option is labeled `(recommended)` — the routing choice is user-intent):**
 
 ```
 A. Review each finding one by one — accept the recommendation or choose another action
@@ -22,6 +22,8 @@ B. LFG. Apply the agent's best-judgment action per finding
 C. Append findings to the doc's Open Questions section and proceed
 D. Report only — take no further action
 ```
+
+The per-finding `(recommended)` labeling lives inside the walk-through (option A) and the bulk preview (options B/C), where it's applied per-finding from synthesis step 3.5b's `recommended_action`. The routing question itself does not recommend one of A/B/C/D because the right route depends on user intent (engage / trust / triage / skim), not on the finding-set shape — a rule that mapped finding-set shape to routing recommendation (e.g., "most findings are Apply-shaped → recommend LFG") would pressure users toward automated paths in ways that conflict with the user-intent framing.
 
 If all remaining findings are FYI-subsection-only (no `gated_auto` or above-gate `manual` findings), skip the routing question entirely and flow to the Phase 5 terminal question.
 

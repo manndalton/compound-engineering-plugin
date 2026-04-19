@@ -27,23 +27,32 @@ Date format: ISO 8601 calendar date (`YYYY-MM-DD`). If multiple reviews occur on
 
 ### Step 3: Format and append the entry
 
-Per deferred finding, append a bullet-point entry with the following fields:
+Per deferred finding, append a bullet-point entry with the following fields. The visible content is a reader-friendly summary; an HTML comment on the entry persists the dedup-key fields so Step 4's compound-key check can run reliably across retries and same-day reruns without requiring the entry format itself to carry machine-oriented metadata:
 
 ```
-- **{title}** ({severity}, {reviewer}, confidence {confidence})
+- **{title}** — {section} ({severity}, {reviewer}, confidence {confidence})
 
   {why_it_matters}
+
+  <!-- dedup-key: section="{normalized_section}" title="{normalized_title}" evidence="{evidence_fingerprint}" -->
 ```
 
 Fields come from the finding's schema:
 
 - `{title}` — the finding's title field
+- `{section}` — the finding's section field, unmodified (human-readable)
 - `{severity}` — P0 / P1 / P2 / P3
 - `{reviewer}` — the persona that produced the finding (after dedup, the persona with the highest confidence; surface all co-flagging personas if multiple)
 - `{confidence}` — rounded to 2 decimal places
 - `{why_it_matters}` — the full why_it_matters text, preserving the framing guidance from the subagent template
 
-Do not include `suggested_fix` or `evidence` in the appended entry. Those live in the review run artifact (when applicable) and do not belong in the document's Open Questions section — the entry is a concern summary for the reader returning later, not a full decision packet.
+HTML-comment fields (machine-readable, used by Step 4 dedup):
+
+- `{normalized_section}` — `normalize(section)` (lowercase, punctuation-stripped, whitespace-collapsed)
+- `{normalized_title}` — `normalize(title)` (same normalization)
+- `{evidence_fingerprint}` — first ~120 chars of the finding's first evidence quote, word-boundary-preserving, internal quotes escaped; empty string when the finding had no evidence
+
+Do not include `suggested_fix` or the full `evidence` array in the appended entry. Those live in the review run artifact (when applicable) and do not belong in the document's Open Questions section — the entry is a concern summary for the reader returning later, not a full decision packet. The HTML-comment dedup-key line is the minimum machine-oriented metadata required for reliable idempotence and deliberately sits on a single line with simple `key="value"` shape so a retry can parse it without a markdown parser.
 
 ### Step 4: Idempotence on compound-key collisions
 
@@ -52,12 +61,14 @@ If an entry with the same compound key already exists under the same `### From Y
 - The same review session re-routes the same finding to Defer a second time (rare but possible via LFG-the-rest after a walk-through Defer)
 - The orchestrator retries after a partial failure
 
-**Compound key for dedup:** `normalize(section) + normalize(title) + evidence_fingerprint`, where:
+**Compound key for dedup:** `normalize(section) + normalize(title) + evidence_fingerprint`, reconstructed from each existing entry's `<!-- dedup-key: ... -->` HTML comment (see Step 3 entry format). For a new finding about to append, compute the same fields from the finding's schema data; for existing entries, parse them out of the HTML comment. Match on all three fields.
 
 - `normalize(section)` and `normalize(title)` use the same normalization as synthesis step 3.3 dedup (lowercase, strip punctuation, collapse whitespace)
-- `evidence_fingerprint` is the first ~120 characters of the finding's first evidence quote (same slice used in the decision primer — see `SKILL.md` under "Decision primer"). When no evidence is available, fall back to section+title alone.
+- `evidence_fingerprint` is the first ~120 characters of the finding's first evidence quote (same slice used in the decision primer — see `SKILL.md` under "Decision primer"). When no evidence is available on the new finding, fall back to section+title alone. When an existing entry's HTML comment has `evidence=""`, treat the entry as evidence-less and also fall back to section+title for that comparison.
 
 Title-only dedup is not sufficient: two different findings in the same document (even in the same review date) can legitimately share a short title if their sections and evidence differ. Using only `{title}` would silently drop one of them — losing user-visible backlog context. The compound key mirrors the R29/R30 matching predicate (`section + title + evidence-substring overlap`) so cross-round and intra-round dedup behave consistently.
+
+**Legacy entries without dedup-key comments:** entries written before this format (if any survive in the wild) lack the HTML comment. When Step 4 encounters such an entry, fall back to title-only comparison for that entry — imperfect, but strictly better than duplicate-appending. This is a backwards-compat behavior for legacy data, not a sanctioned format.
 
 On collision, record the no-op in the completion report's Coverage section so the user sees the duplicate was suppressed. Cross-subsection collisions (same compound key, different dates) are not deduplicated — each review is allowed to re-raise the same concern.
 
@@ -116,9 +127,11 @@ Starting document state:
 
 ### From 2026-04-10 review
 
-- **Alias compatibility-theater concern** (P1, scope-guardian, confidence 0.87)
+- **Alias compatibility-theater concern** — Risks (P1, scope-guardian, confidence 0.87)
 
   The alias exists without documented external consumers...
+
+  <!-- dedup-key: section="risks" title="alias compatibilitytheater concern" evidence="the alias exists without documented external consumers" -->
 
 ```
 
@@ -133,20 +146,26 @@ After appending two findings in a 2026-04-18 session:
 
 ### From 2026-04-10 review
 
-- **Alias compatibility-theater concern** (P1, scope-guardian, confidence 0.87)
+- **Alias compatibility-theater concern** — Risks (P1, scope-guardian, confidence 0.87)
 
   The alias exists without documented external consumers...
 
+  <!-- dedup-key: section="risks" title="alias compatibilitytheater concern" evidence="the alias exists without documented external consumers" -->
+
 ### From 2026-04-18 review
 
-- **Unit 2/3 merge judgment call** (P2, scope-guardian, confidence 0.78)
+- **Unit 2/3 merge judgment call** — Scope Boundaries (P2, scope-guardian, confidence 0.78)
 
   The two units update consumer sites that deploy together. Splitting
   adds dependency tracking without enabling independent delivery.
 
-- **Strawman alternatives on migration strategy** (P2, coherence, confidence 0.72)
+  <!-- dedup-key: section="scope boundaries" title="unit 23 merge judgment call" evidence="the two units update consumer sites that deploy together" -->
+
+- **Strawman alternatives on migration strategy** — Unit 3 Files (P2, coherence, confidence 0.72)
 
   The fix options list (a) through (c) as alternatives, but (b) and (c)
   are "accept the regression" framings that don't solve the problem the
   finding describes.
+
+  <!-- dedup-key: section="unit 3 files" title="strawman alternatives on migration strategy" evidence="the fix options list a through c as alternatives but b and c" -->
 ```
