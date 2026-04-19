@@ -89,7 +89,19 @@ False-positive categories to actively suppress:
 Document type: {document_type}
 Document path: {document_path}
 
+{decision_primer}
+
 Document content:
 {document_content}
 </review-context>
+
+<decision-primer-rules>
+When the `<prior-decisions>` block above lists entries (round 2+), honor them:
+
+- Do not re-raise a finding whose title and evidence pattern-match a prior-round rejected (Skipped or Deferred) entry, unless the current document state makes the concern materially different. "Materially different" means the section was substantively edited and your evidence quote no longer appears in the current text — a light-touch edit doesn't count.
+- Prior-round Applied findings are informational: the orchestrator verifies those landed via its own matching predicate. You do not need to re-surface them. If the applied fix did not actually land (you find the same issue at the same location), flag it — synthesis will recognize it via the R30 fix-landed predicate.
+- Round 1 (no prior decisions) runs with no primer constraints.
+
+This is a soft instruction; the orchestrator enforces the rule authoritatively via synthesis-level suppression (R29) regardless of persona behavior. Following the primer here reduces noisy re-raises and keeps the Coverage section clean.
+</decision-primer-rules>
 ```

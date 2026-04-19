@@ -130,8 +130,39 @@ Dispatch all agents in **parallel** using the platform's task/agent tool (e.g., 
 | `{document_type}` | "requirements" or "plan" from Phase 1 classification |
 | `{document_path}` | Path to the document |
 | `{document_content}` | Full text of the document |
+| `{decision_primer}` | Cumulative prior-round decisions in the current session, or an empty `<prior-decisions>` block on round 1. See "Decision primer" below. |
 
-Pass each agent the **full document** -- do not split into sections.
+Pass each agent the **full document** — do not split into sections.
+
+### Decision primer
+
+On round 1 (no prior decisions), set `{decision_primer}` to:
+
+```
+<prior-decisions>
+Round 1 — no prior decisions.
+</prior-decisions>
+```
+
+On round 2+ (after one or more prior rounds in the current interactive session), accumulate prior-round decisions and render them as:
+
+```
+<prior-decisions>
+Round 1 — applied (N entries):
+- {section}: "{title}" ({reviewer}, {confidence})
+
+Round 1 — rejected (M entries):
+- {section}: "{title}" — Skipped because {reason}
+- {section}: "{title}" — Deferred to Open Questions because {reason or "no reason provided"}
+
+Round 2 — applied (N entries):
+...
+</prior-decisions>
+```
+
+Accumulate across all rounds in the current session. Skip and Defer actions both count as "rejected" for suppression purposes — both signal the user decided the finding wasn't worth actioning this round. Applied findings stay on the applied list so round-N+1 personas can verify fixes landed (see R30 in `references/synthesis-and-presentation.md`).
+
+Cross-session persistence is out of scope. A new invocation of ce-doc-review on the same document starts with a fresh round 1 and no carried primer, even if prior sessions deferred findings into the document's Open Questions section.
 
 **Error handling:** If an agent fails or times out, proceed with findings from agents that completed. Note the failed agent in the Coverage section. Do not block the entire review on a single agent failure.
 

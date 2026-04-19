@@ -162,6 +162,18 @@ Brief summary at the top: "Applied N safe_auto fixes. K findings to consider (X 
 
 Include the Coverage table, applied fixes, FYI observations (as a distinct subsection), residual concerns, and deferred questions.
 
+### R29 Rejected-Finding Suppression (Round 2+)
+
+When the orchestrator is running round 2+ on the same document in the same session, the decision primer (see `SKILL.md` — Decision primer) carries forward every prior-round Skipped and Deferred finding. Synthesis suppresses re-raised rejected findings rather than re-surfacing them to the user.
+
+For each current-round finding, compare against the primer's rejected list:
+
+- **Matching predicate:** same as R30 — `normalize(section) + normalize(title)` fingerprint augmented with evidence-substring overlap check (>50%). If a current-round finding matches a prior-round rejected finding on fingerprint AND evidence overlap, drop the current-round finding.
+- **Materially-different exception:** if the current document state has changed around the finding's section since the prior round (e.g., the section was edited and the evidence quote no longer appears in the current text), treat the finding as new — the underlying context shifted and the concern may be genuinely different now. The persona's evidence itself reveals this: a quote that doesn't appear in the current document is a signal the prior-round rejection no longer applies.
+- **On suppression:** record the drop in Coverage with a "previously rejected, re-raised this round" note so the user can see what was suppressed. The user can explicitly escalate by invoking the review again on a different context if they believe the suppression was wrong.
+
+This rule runs at synthesis time, not at the persona level. Personas have a soft instruction via the subagent template's `{decision_primer}` variable to avoid re-raising rejected findings, but the orchestrator is the authoritative gate — if a persona re-raises despite the primer, synthesis drops the finding.
+
 ### R30 Fix-Landed Matching Predicate
 
 When the orchestrator is running round 2+ on the same document (see Unit 7 multi-round memory), synthesis verifies that prior-round Applied findings actually landed. For each prior-round Applied finding:
@@ -180,13 +192,45 @@ During synthesis, discard any finding that recommends deleting or removing files
 
 These are pipeline artifacts and must not be flagged for removal.
 
-## Phase 5: Next Action
+## Phase 5: Next Action — Terminal Question
 
 **Headless mode:** Return "Review complete" immediately. Do not ask questions. The caller receives the text envelope from Phase 4 and handles any remaining findings.
 
-**Interactive mode:** See Unit 5 (`references/walkthrough.md`) for the routing question and per-finding walk-through, and Unit 7's terminal question behavior (three options: apply-and-proceed / apply-and-re-review / exit). Unit 4 (this file) routes findings into tiers and hands them to Unit 5 for interaction.
+**Interactive mode:** fire the terminal question using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). This question is distinct from the mid-flow routing question (`references/walkthrough.md`) — the routing question chooses *how* to engage with findings, this one chooses *what to do next* once engagement is complete. Do not merge them.
 
-Return "Review complete" as the terminal signal for callers.
+**Stem:** `Apply decisions and what next?`
+
+**Options (three by default; two in the zero-actionable case):**
+
+When `fixes_applied_count > 0` (at least one safe_auto or Apply decision has landed this session):
+
+```
+A. Apply decisions and proceed to <next stage>
+B. Apply decisions and re-review
+C. Exit without further action
+```
+
+When `fixes_applied_count == 0` (zero-actionable case, or the user took routing option D / every walk-through decision was Skip):
+
+```
+A. Proceed to <next stage>
+B. Exit without further action
+```
+
+The `<next stage>` substitution uses the document type from Phase 1:
+
+- Requirements document → `ce-plan`
+- Plan document → `ce-work`
+
+**Label adaptation:** when no decisions are queued to apply, the primary option drops the `Apply decisions and` prefix — the label should match what the system is doing. `Apply decisions and proceed` when fixes are queued; `Proceed` when nothing is queued.
+
+**Caller-context handling (implicit):** the terminal question's "Proceed to <next stage>" option is interpreted contextually by the agent from the visible conversation state. When ce-doc-review is invoked from inside another skill's flow (e.g., ce-brainstorm Phase 4 re-review, ce-plan phase 5.3.8), the agent does not fire a nested `/ce-plan` or `/ce-work` dispatch — it returns control to the caller's flow which continues its own logic. When invoked standalone, "Proceed" dispatches the appropriate next skill. No explicit caller-hint argument is required; if this implicit handling proves unreliable in practice, an explicit `nested:true` flag can be added as a follow-up.
+
+### Iteration limit
+
+After 2 refinement passes, recommend completion — diminishing returns are likely. But if the user wants to continue, allow it; the primer carries all prior-round decisions so later rounds suppress repeat findings cleanly.
+
+Return "Review complete" as the terminal signal for callers, regardless of which option the user picked.
 
 ## What NOT to Do
 
