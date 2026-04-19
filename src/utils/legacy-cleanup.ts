@@ -20,9 +20,30 @@ import { parseFrontmatter } from "./frontmatter"
 
 /** Old skill directory names that no longer exist after the v3 rename. */
 const STALE_SKILL_DIRS = [
-  // ce: -> ce- (dirs were already hyphenated by sanitizePathName, so these
-  // only collide if the old name was exactly the same after sanitization —
-  // which it was for all 8 workflow skills. No orphans from this group.)
+  // ce: -> ce-. Some targets sanitized these to ce-*; others left raw colon
+  // directories on filesystems that permit them.
+  "ce:brainstorm",
+  "ce:compound",
+  "ce:compound-refresh",
+  "ce:ideate",
+  "ce:plan",
+  "ce:plan-beta",
+  "ce:review",
+  "ce:review-beta",
+  "ce:work",
+  "ce:work-beta",
+
+  // workflows:* -> ce-*.
+  "workflows:brainstorm",
+  "workflows:compound",
+  "workflows:plan",
+  "workflows:review",
+  "workflows:work",
+  "workflows-brainstorm",
+  "workflows-compound",
+  "workflows-plan",
+  "workflows-review",
+  "workflows-work",
 
   // git-* -> ce-*
   "git-commit",
@@ -62,6 +83,8 @@ const STALE_SKILL_DIRS = [
   // ce-review -> ce-code-review, ce-document-review -> ce-doc-review
   "ce-review",
   "ce-document-review",
+  "ce-plan-beta",
+  "ce-review-beta",
 ]
 
 /** Old agent names (used as generated skill dirs or flat .md files). */
@@ -225,6 +248,14 @@ const LEGACY_ONLY_SKILL_DESCRIPTIONS: Record<string, string> = {
     "This skill should be used when orchestrating multi-agent swarms using Claude Code's TeammateTool and Task system. It applies when coordinating multiple agents, running parallel code reviews, creating pipeline workflows with dependencies, building self-organizing task queues, or any task benefiting from divide-and-conquer patterns.",
   "reproduce-bug":
     "Systematically reproduce and investigate a bug from a GitHub issue. Use when the user provides a GitHub issue number or URL for a bug they want reproduced or investigated.",
+  "ce:plan-beta":
+    "[BETA] Transform feature descriptions or requirements into structured implementation plans grounded in repo patterns and research. Use when the user says 'plan this', 'create a plan', 'write a tech plan', 'plan the implementation', 'how should we build', 'what's the approach for', 'break this down', or when a brainstorm/requirements document is ready for technical planning. Best when requirements are at least roughly defined; for exploratory or ambiguous requests, prefer ce:brainstorm first.",
+  "ce-plan-beta":
+    "[BETA] Transform feature descriptions or requirements into structured implementation plans grounded in repo patterns and research. Use when the user says 'plan this', 'create a plan', 'write a tech plan', 'plan the implementation', 'how should we build', 'what's the approach for', 'break this down', or when a brainstorm/requirements document is ready for technical planning. Best when requirements are at least roughly defined; for exploratory or ambiguous requests, prefer ce:brainstorm first.",
+  "ce:review-beta":
+    "[BETA] Structured code review using tiered persona agents, confidence-gated findings, and a merge/dedup pipeline. Use when reviewing code changes before creating a PR.",
+  "ce-review-beta":
+    "[BETA] Structured code review using tiered persona agents, confidence-gated findings, and a merge/dedup pipeline. Use when reviewing code changes before creating a PR.",
 }
 
 /**
@@ -248,6 +279,19 @@ type LegacyFingerprints = {
 let legacyFingerprintsPromise: Promise<LegacyFingerprints> | null = null
 
 function currentSkillNameForLegacy(legacyName: string): string {
+  if (legacyName === "ce:review" || legacyName === "workflows:review" || legacyName === "workflows-review") {
+    return "ce-code-review"
+  }
+  if (legacyName.startsWith("ce:")) {
+    return legacyName.replace(/^ce:/, "ce-")
+  }
+  if (legacyName.startsWith("workflows:")) {
+    return `ce-${legacyName.slice("workflows:".length)}`
+  }
+  if (legacyName.startsWith("workflows-")) {
+    return `ce-${legacyName.slice("workflows-".length)}`
+  }
+
   switch (legacyName) {
     case "git-commit":
       return "ce-commit"

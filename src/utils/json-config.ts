@@ -1,5 +1,5 @@
 import path from "path"
-import { pathExists, readJson, writeJsonSecure } from "../utils/files"
+import { pathExists, readJson, writeJsonSecure } from "./files"
 
 type JsonObject = Record<string, unknown>
 
@@ -19,7 +19,7 @@ export async function mergeJsonConfigAtKey(options: {
     ...existing,
     [key]: {
       ...existingEntries,
-      ...incoming, // incoming plugin entries overwrite same-named servers
+      ...incoming,
     },
   }
 

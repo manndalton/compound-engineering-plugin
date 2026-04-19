@@ -1,3 +1,4 @@
+import fs from "fs/promises"
 import path from "path"
 import {
   backupFile,
@@ -11,10 +12,12 @@ import {
 } from "../utils/files"
 import { transformContentForPi } from "../converters/claude-to-pi"
 import type { PiBundle } from "../types/pi"
-import { cleanupStaleSkillDirs, cleanupStaleAgents } from "../utils/legacy-cleanup"
+import { getLegacyPiArtifacts } from "../data/plugin-legacy-artifacts"
+import { cleanupStaleAgents } from "../utils/legacy-cleanup"
 
 const PI_AGENTS_BLOCK_START = "<!-- BEGIN COMPOUND PI TOOL MAP -->"
 const PI_AGENTS_BLOCK_END = "<!-- END COMPOUND PI TOOL MAP -->"
+const PI_INSTALL_MANIFEST = "install-manifest.json"
 
 const PI_AGENTS_BLOCK_BODY = `## Compound Engineering (Pi compatibility)
 
@@ -28,27 +31,59 @@ Compatibility notes:
 - MCPorter config path: .pi/compound-engineering/mcporter.json (project) or ~/.pi/agent/compound-engineering/mcporter.json (global)
 `
 
+type PiInstallManifest = {
+  version: 1
+  pluginName: string
+  skills: string[]
+  prompts: string[]
+  extensions: string[]
+}
+
+type PiPaths = {
+  managedDir: string
+  skillsDir: string
+  promptsDir: string
+  extensionsDir: string
+  mcporterConfigPath: string
+  agentsPath: string
+}
+
 export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promise<void> {
   const paths = resolvePiPaths(outputRoot)
+  const pluginName = bundle.pluginName ? sanitizeCodexPathComponent(bundle.pluginName) : undefined
+  const manifest = pluginName ? await readInstallManifest(paths.managedDir, pluginName) : null
+  const currentPrompts = bundle.prompts.map((prompt) => `${sanitizePathName(prompt.name)}.md`)
+  const currentSkills = [
+    ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
+    ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
+  ]
+  const currentExtensions = bundle.extensions.map((extension) => extension.name)
 
   await ensureDir(paths.skillsDir)
   await ensureDir(paths.promptsDir)
   await ensureDir(paths.extensionsDir)
 
-  // TODO(cleanup): Remove after v3 transition (circa Q3 2026)
-  await cleanupStaleSkillDirs(paths.skillsDir)
   await cleanupStaleAgents(paths.skillsDir, null)
+  await cleanupRemovedPrompts(paths.promptsDir, manifest, currentPrompts)
+  await cleanupRemovedSkills(paths.skillsDir, manifest, currentSkills)
+  await cleanupRemovedExtensions(paths.extensionsDir, manifest, currentExtensions)
 
   for (const prompt of bundle.prompts) {
     await writeText(path.join(paths.promptsDir, `${sanitizePathName(prompt.name)}.md`), prompt.content + "\n")
   }
 
   for (const skill of bundle.skillDirs) {
-    await copySkillDir(skill.sourceDir, path.join(paths.skillsDir, sanitizePathName(skill.name)), transformContentForPi)
+    const skillName = sanitizePathName(skill.name)
+    const targetDir = path.join(paths.skillsDir, skillName)
+    await cleanupCurrentManagedSkillDir(targetDir, manifest, skillName)
+    await copySkillDir(skill.sourceDir, targetDir, transformContentForPi)
   }
 
   for (const skill of bundle.generatedSkills) {
-    await writeText(path.join(paths.skillsDir, sanitizePathName(skill.name), "SKILL.md"), skill.content + "\n")
+    const skillName = sanitizePathName(skill.name)
+    const targetDir = path.join(paths.skillsDir, skillName)
+    await cleanupCurrentManagedSkillDir(targetDir, manifest, skillName)
+    await writeText(path.join(targetDir, "SKILL.md"), skill.content + "\n")
   }
 
   for (const extension of bundle.extensions) {
@@ -64,14 +99,25 @@ export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promi
   }
 
   await ensurePiAgentsBlock(paths.agentsPath)
+
+  if (pluginName) {
+    await writeInstallManifest(paths.managedDir, {
+      version: 1,
+      pluginName,
+      skills: currentSkills,
+      prompts: currentPrompts,
+      extensions: currentExtensions,
+    })
+    await cleanupKnownLegacyPiArtifacts(paths, bundle)
+  }
 }
 
-function resolvePiPaths(outputRoot: string) {
+function resolvePiPaths(outputRoot: string): PiPaths {
   const base = path.basename(outputRoot)
 
-  // Global install root: ~/.pi/agent
   if (base === "agent") {
     return {
+      managedDir: path.join(outputRoot, "compound-engineering"),
       skillsDir: path.join(outputRoot, "skills"),
       promptsDir: path.join(outputRoot, "prompts"),
       extensionsDir: path.join(outputRoot, "extensions"),
@@ -80,9 +126,9 @@ function resolvePiPaths(outputRoot: string) {
     }
   }
 
-  // Project local .pi directory
   if (base === ".pi") {
     return {
+      managedDir: path.join(outputRoot, "compound-engineering"),
       skillsDir: path.join(outputRoot, "skills"),
       promptsDir: path.join(outputRoot, "prompts"),
       extensionsDir: path.join(outputRoot, "extensions"),
@@ -91,8 +137,8 @@ function resolvePiPaths(outputRoot: string) {
     }
   }
 
-  // Custom output root -> nest under .pi
   return {
+    managedDir: path.join(outputRoot, ".pi", "compound-engineering"),
     skillsDir: path.join(outputRoot, ".pi", "skills"),
     promptsDir: path.join(outputRoot, ".pi", "prompts"),
     extensionsDir: path.join(outputRoot, ".pi", "extensions"),
@@ -135,4 +181,115 @@ function upsertBlock(existing: string, block: string): string {
   }
 
   return existing.trimEnd() + "\n\n" + block + "\n"
+}
+
+function sanitizeCodexPathComponent(name: string): string {
+  return sanitizePathName(name).replace(/[\\/]/g, "-")
+}
+
+async function readInstallManifest(managedDir: string, pluginName: string): Promise<PiInstallManifest | null> {
+  const manifestPath = path.join(managedDir, PI_INSTALL_MANIFEST)
+  try {
+    const raw = await readText(manifestPath)
+    const parsed = JSON.parse(raw) as Partial<PiInstallManifest>
+    if (
+      parsed.version === 1 &&
+      parsed.pluginName === pluginName &&
+      Array.isArray(parsed.skills) &&
+      Array.isArray(parsed.prompts) &&
+      Array.isArray(parsed.extensions)
+    ) {
+      return parsed as PiInstallManifest
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn(`Ignoring unreadable Pi install manifest at ${manifestPath}.`)
+    }
+  }
+  return null
+}
+
+async function writeInstallManifest(managedDir: string, manifest: PiInstallManifest): Promise<void> {
+  await writeJson(path.join(managedDir, PI_INSTALL_MANIFEST), manifest)
+}
+
+async function cleanupRemovedSkills(
+  skillsDir: string,
+  manifest: PiInstallManifest | null,
+  currentSkills: string[],
+): Promise<void> {
+  if (!manifest) return
+  const current = new Set(currentSkills)
+  for (const skillName of manifest.skills) {
+    if (!current.has(skillName)) {
+      await fs.rm(path.join(skillsDir, skillName), { recursive: true, force: true })
+    }
+  }
+}
+
+async function cleanupRemovedPrompts(
+  promptsDir: string,
+  manifest: PiInstallManifest | null,
+  currentPrompts: string[],
+): Promise<void> {
+  if (!manifest) return
+  const current = new Set(currentPrompts)
+  for (const promptFile of manifest.prompts) {
+    if (!current.has(promptFile)) {
+      await fs.rm(path.join(promptsDir, promptFile), { force: true })
+    }
+  }
+}
+
+async function cleanupRemovedExtensions(
+  extensionsDir: string,
+  manifest: PiInstallManifest | null,
+  currentExtensions: string[],
+): Promise<void> {
+  if (!manifest) return
+  const current = new Set(currentExtensions)
+  for (const extensionFile of manifest.extensions) {
+    if (!current.has(extensionFile)) {
+      await fs.rm(path.join(extensionsDir, extensionFile), { force: true })
+    }
+  }
+}
+
+async function cleanupCurrentManagedSkillDir(
+  targetDir: string,
+  manifest: PiInstallManifest | null,
+  skillName: string,
+): Promise<void> {
+  if (!manifest?.skills.includes(skillName)) return
+  await fs.rm(targetDir, { recursive: true, force: true })
+}
+
+async function cleanupKnownLegacyPiArtifacts(paths: PiPaths, bundle: PiBundle): Promise<void> {
+  const pluginName = bundle.pluginName
+  if (!pluginName) return
+
+  const legacyArtifacts = getLegacyPiArtifacts(bundle)
+  for (const skillName of legacyArtifacts.skills) {
+    const legacySkillPath = path.join(paths.skillsDir, skillName)
+    await moveLegacyArtifactToBackup(paths.managedDir, "skills", legacySkillPath)
+  }
+
+  for (const promptFile of legacyArtifacts.prompts) {
+    const legacyPromptPath = path.join(paths.promptsDir, promptFile)
+    await moveLegacyArtifactToBackup(paths.managedDir, "prompts", legacyPromptPath)
+  }
+}
+
+async function moveLegacyArtifactToBackup(
+  managedDir: string,
+  kind: "skills" | "prompts",
+  artifactPath: string,
+): Promise<void> {
+  if (!(await pathExists(artifactPath))) return
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+  const backupDir = path.join(managedDir, "legacy-backup", timestamp, kind)
+  const backupPath = path.join(backupDir, path.basename(artifactPath))
+  await ensureDir(backupDir)
+  await fs.rename(artifactPath, backupPath)
+  console.warn(`Moved legacy Pi ${kind.slice(0, -1)} artifact to ${backupPath}`)
 }

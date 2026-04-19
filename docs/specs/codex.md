@@ -1,6 +1,6 @@
-# Codex Spec (Config, Prompts, Skills, MCP)
+# Codex Spec (Config, Prompts, Skills, Subagents, MCP)
 
-Last verified: 2026-01-21
+Last verified: 2026-04-18
 
 ## Primary sources
 
@@ -10,6 +10,7 @@ https://developers.openai.com/codex/config-advanced
 https://developers.openai.com/codex/custom-prompts
 https://developers.openai.com/codex/skills
 https://developers.openai.com/codex/skills/create-skill
+https://developers.openai.com/codex/subagents
 https://developers.openai.com/codex/guides/agents-md
 https://developers.openai.com/codex/mcp
 ```
@@ -49,10 +50,25 @@ https://developers.openai.com/codex/mcp
 - Required fields are single-line with length limits (name ≤ 100 chars, description ≤ 500 chars). citeturn3view4
 - At startup, Codex loads only each skill’s name/description; full content is injected when invoked. citeturn3view3turn3view4
 - Skills can be repo-scoped in `.agents/skills/` and are discovered from the current working directory up to the repository root. User-scoped skills live in `~/.agents/skills/`. citeturn1view1turn1view4
-- Inference: some existing tooling and user setups still use `.codex/skills/` and `~/.codex/skills/` as legacy compatibility paths, but those locations are not documented in the current OpenAI Codex skills docs linked above.
-- Compound Engineering installs generated Codex skills into `~/.codex/<plugin>/skills/` and exposes that directory through `~/.agents/skills/<plugin>` as a symlink. This keeps plugin-owned skills isolated while using Codex's documented user skill discovery root.
+- Inference: some existing tooling and user setups still use `.codex/skills/` and `~/.codex/skills/` as compatibility paths, but those locations are not documented in the current OpenAI Codex skills docs linked above.
+- Compound Engineering should avoid `~/.agents/skills` for managed installs because that shared root can shadow Copilot's native plugin skills. Use the Codex-specific compatibility root `~/.codex/skills/compound-engineering/<skill-name>/SKILL.md` for CE Codex skills, and track generated files with a CE manifest.
 - Codex also supports admin-scoped skills in `/etc/codex/skills` plus built-in system skills bundled with Codex. citeturn1view4
 - Skills can be invoked explicitly using `/skills` or `$skill-name`. citeturn3view3
+
+## Subagents and custom agents
+
+- Codex subagent workflows are enabled by default in current releases.
+- Codex only spawns subagents when explicitly asked.
+- Custom agent files are standalone TOML files under `~/.codex/agents/` for personal agents or `.codex/agents/` for project-scoped agents.
+- Each TOML file defines one custom agent. Required fields:
+  - `name`
+  - `description`
+  - `developer_instructions`
+- Optional fields can include `nickname_candidates`, `model`, `model_reasoning_effort`, `sandbox_mode`, `mcp_servers`, and `skills.config`.
+- The TOML `name` field is the source of truth; matching the filename to the agent name is only a convention.
+- Current CE output still converts Claude Markdown agents into generated Codex skills. A future Codex migration can convert them to flat custom-agent TOML files once orchestration references and cleanup semantics are updated together.
+- If CE generates Codex custom agents, those files are Codex-only artifacts and belong under `~/.codex/agents`, not `~/.agents/skills`.
+- For future generated TOML agents, use CE-prefixed agent names, preferably derived from the source category and agent name such as `ce-review-correctness-reviewer` or `ce-research-repo-research-analyst`. Current docs describe one direct TOML file per agent under `~/.codex/agents`; do not assume nested agent directories are discovered.
 
 ## MCP (Model Context Protocol)
 

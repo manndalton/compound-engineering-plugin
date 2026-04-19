@@ -4,6 +4,7 @@ import { backupFile, copyDir, copySkillDir, ensureDir, pathExists, sanitizePathN
 import type { CodexBundle } from "../types/codex"
 import type { ClaudeMcpServer } from "../types/claude"
 import { transformContentForCodex } from "../utils/codex-content"
+import { getLegacyCodexArtifacts } from "../data/plugin-legacy-artifacts"
 
 const MANAGED_START_MARKER = "# BEGIN Compound Engineering plugin MCP -- do not edit this block"
 const MANAGED_END_MARKER = "# END Compound Engineering plugin MCP"
@@ -18,14 +19,6 @@ type CodexInstallManifest = {
   pluginName: string
   skills: string[]
   prompts: string[]
-}
-
-const LEGACY_REMOVED_CODEX_SKILLS: Record<string, string[]> = {
-  "compound-engineering": ["reproduce-bug"],
-}
-
-const LEGACY_REMOVED_CODEX_PROMPTS: Record<string, string[]> = {
-  "compound-engineering": ["reproduce-bug"],
 }
 
 export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle): Promise<void> {
@@ -47,7 +40,7 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
   }
 
   const skillsRoot = pluginName
-    ? path.join(codexRoot, pluginName, "skills")
+    ? path.join(codexRoot, "skills", pluginName)
     : path.join(codexRoot, "skills")
   const currentSkills = [
     ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
@@ -88,8 +81,9 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
       skills: currentSkills,
       prompts: currentPrompts,
     })
-    await ensureAgentsSkillSymlink(codexRoot, pluginName, skillsRoot)
-    await cleanupKnownLegacyCodexArtifacts(codexRoot, pluginName)
+    await cleanupKnownLegacyCodexArtifacts(codexRoot, bundle)
+    await cleanupLegacyAgentsSkillSymlinks(codexRoot, pluginName, currentSkills, manifest)
+    await cleanupPreviousManagedCodexSkillStore(codexRoot, pluginName)
   }
 
   const configPath = path.join(codexRoot, "config.toml")
@@ -175,53 +169,100 @@ async function cleanupCurrentManagedSkillDir(
   await fs.rm(targetDir, { recursive: true, force: true })
 }
 
-async function ensureAgentsSkillSymlink(
-  codexRoot: string,
-  pluginName: string,
-  skillsRoot: string,
-): Promise<void> {
-  const agentsSkillsDir = path.join(path.dirname(codexRoot), ".agents", "skills")
-  const symlinkPath = path.join(agentsSkillsDir, pluginName)
-  await ensureDir(agentsSkillsDir)
+async function cleanupKnownLegacyCodexArtifacts(codexRoot: string, bundle: CodexBundle): Promise<void> {
+  const pluginName = bundle.pluginName
+  if (!pluginName) return
 
-  try {
-    const stat = await fs.lstat(symlinkPath)
-    if (stat.isSymbolicLink()) {
-      try {
-        const existingTarget = await fs.realpath(symlinkPath)
-        const desiredTarget = await fs.realpath(skillsRoot)
-        if (existingTarget === desiredTarget) return
-      } catch (err) {
-        if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-          throw err
-        }
-      }
-      await fs.unlink(symlinkPath)
-    } else {
-      console.warn(`Skipping ${symlinkPath}: a real file or directory exists there. Remove it manually to replace with the Codex skills symlink.`)
-      return
-    }
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw err
-    }
-  }
-
-  await fs.symlink(skillsRoot, symlinkPath, process.platform === "win32" ? "junction" : "dir")
-}
-
-async function cleanupKnownLegacyCodexArtifacts(codexRoot: string, pluginName: string): Promise<void> {
-  const removedSkills = LEGACY_REMOVED_CODEX_SKILLS[pluginName] ?? []
-  for (const skillName of removedSkills) {
+  const legacyArtifacts = getLegacyCodexArtifacts(bundle)
+  for (const skillName of legacyArtifacts.skills) {
     const legacySkillPath = path.join(codexRoot, "skills", skillName)
     await moveLegacyArtifactToBackup(codexRoot, pluginName, "skills", legacySkillPath)
   }
 
-  const removedPrompts = LEGACY_REMOVED_CODEX_PROMPTS[pluginName] ?? []
-  for (const promptName of removedPrompts) {
-    const legacyPromptPath = path.join(codexRoot, "prompts", `${promptName}.md`)
+  for (const promptFile of legacyArtifacts.prompts) {
+    const legacyPromptPath = path.join(codexRoot, "prompts", promptFile)
     await moveLegacyArtifactToBackup(codexRoot, pluginName, "prompts", legacyPromptPath)
   }
+}
+
+async function cleanupLegacyAgentsSkillSymlinks(
+  codexRoot: string,
+  pluginName: string,
+  currentSkills: string[],
+  manifest: CodexInstallManifest | null,
+): Promise<void> {
+  const candidateSkillNames = new Set([...currentSkills, ...(manifest?.skills ?? [])])
+  const legacyArtifacts = getLegacyCodexArtifacts({
+    pluginName,
+    prompts: [],
+    skillDirs: [...candidateSkillNames].map((name) => ({ name, sourceDir: "" })),
+    generatedSkills: [],
+  })
+  const agentsSkillsDir = path.join(path.dirname(codexRoot), ".agents", "skills")
+  const rawManagedRoots = [
+    path.join(codexRoot, pluginName),
+    path.join(codexRoot, "skills", pluginName),
+  ]
+  const managedRoots = [
+    ...rawManagedRoots,
+    ...(await Promise.all(rawManagedRoots.map((root) => canonicalizePath(root)))),
+  ]
+
+  await removeAgentsSkillSymlinkIfManaged(path.join(agentsSkillsDir, pluginName), managedRoots)
+  for (const skillName of legacyArtifacts.skills) {
+    await removeAgentsSkillSymlinkIfManaged(path.join(agentsSkillsDir, skillName), managedRoots)
+  }
+}
+
+async function cleanupPreviousManagedCodexSkillStore(codexRoot: string, pluginName: string): Promise<void> {
+  await fs.rm(path.join(codexRoot, pluginName, "skills"), { recursive: true, force: true })
+}
+
+async function removeAgentsSkillSymlinkIfManaged(symlinkPath: string, managedRoots: string[]): Promise<void> {
+  let stats
+  try {
+    stats = await fs.lstat(symlinkPath)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return
+    throw err
+  }
+  if (!stats.isSymbolicLink()) return
+
+  const resolvedTarget = await readResolvedSymlinkTarget(symlinkPath)
+  if (!resolvedTarget) return
+  if (!managedRoots.some((root) => isPathInside(resolvedTarget, root))) return
+
+  try {
+    await fs.unlink(symlinkPath)
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+  }
+}
+
+async function readResolvedSymlinkTarget(symlinkPath: string): Promise<string | null> {
+  try {
+    return await fs.realpath(symlinkPath)
+  } catch {
+    try {
+      const linkTarget = await fs.readlink(symlinkPath)
+      return path.resolve(path.dirname(symlinkPath), linkTarget)
+    } catch {
+      return null
+    }
+  }
+}
+
+async function canonicalizePath(filePath: string): Promise<string> {
+  try {
+    return await fs.realpath(filePath)
+  } catch {
+    return path.resolve(filePath)
+  }
+}
+
+function isPathInside(candidatePath: string, rootPath: string): boolean {
+  const relative = path.relative(path.resolve(rootPath), path.resolve(candidatePath))
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
 }
 
 async function moveLegacyArtifactToBackup(
