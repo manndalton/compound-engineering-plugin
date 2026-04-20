@@ -114,6 +114,7 @@ export default defineCommand({
     }
     const targetNames = resolveCleanupTargets(String(args.target))
     const outputRoot = resolveWorkspaceRoot(args.output)
+    const hasExplicitGeminiHome = hasExplicitValue(args.geminiHome)
     const roots = {
       codexHome: resolveTargetHome(args.codexHome, path.join(os.homedir(), ".codex")),
       piHome: resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent")),
@@ -126,7 +127,8 @@ export default defineCommand({
       windsurfHome: resolveTargetHome(args.windsurfHome, path.join(os.homedir(), ".codeium", "windsurf")),
       agentsHome: resolveTargetHome(args.agentsHome, path.join(os.homedir(), ".agents")),
       workspaceRoot: outputRoot,
-      hasExplicitOutput: Boolean(args.output && String(args.output).trim()),
+      hasExplicitOutput: hasExplicitValue(args.output),
+      hasExplicitGeminiHome,
     }
 
     const results: CleanupResult[] = []
@@ -158,6 +160,7 @@ async function cleanupTarget(
     agentsHome: string
     workspaceRoot: string
     hasExplicitOutput: boolean
+    hasExplicitGeminiHome: boolean
   },
 ): Promise<CleanupResult[]> {
   switch (target) {
@@ -170,8 +173,22 @@ async function cleanupTarget(
       return [await cleanupOpenCode(plugin, roots.opencodeHome)]
     case "pi":
       return [await cleanupPi(plugin, roots.piHome)]
-    case "gemini":
-      return [await cleanupGemini(plugin, roots.geminiHome)]
+    case "gemini": {
+      // `install`/`convert` write Gemini output to `<cwd>/.gemini` by default
+      // (see `resolveTargetOutputRoot`), so cleanup must scan the workspace
+      // root in the same default flow. When neither `--gemini-home` nor
+      // `--output` is set, also scan `~/.gemini` as a safety net for users
+      // who installed to the home-scoped location with an older CLI.
+      if (roots.hasExplicitGeminiHome) {
+        return [await cleanupGemini(plugin, roots.geminiHome)]
+      }
+      const workspaceGemini = resolveGeminiWorkspaceRoot(roots.workspaceRoot)
+      if (roots.hasExplicitOutput) {
+        return [await cleanupGemini(plugin, workspaceGemini)]
+      }
+      const rootsToClean = [workspaceGemini, roots.geminiHome]
+      return await Promise.all(rootsToClean.map((root) => cleanupGemini(plugin, root)))
+    }
     case "kiro":
       return [await cleanupKiro(plugin, roots.kiroHome)]
     case "copilot": {
@@ -328,27 +345,29 @@ async function cleanupKiro(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>,
 }
 
 async function cleanupCopilot(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>, copilotRoot: string): Promise<CleanupResult> {
+  // IMPORTANT: legacy detection for Copilot roots must be driven exclusively
+  // by the historical allow-list returned from `getLegacyCopilotArtifacts`
+  // (see EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN). Mirrors the Codex/Droid/Windsurf
+  // cleanup fixes: seeding candidates from the current plugin bundle would
+  // sweep up user-authored files at workspace paths like
+  // `.github/skills/ce-plan/SKILL.md` or `.github/agents/<name>.agent.md` that
+  // happen to share a name with a current CE artifact but were never
+  // installed by this plugin. The Copilot writer has been removed — users now
+  // install via `copilot plugin install` — so this cleanup exists solely to
+  // back up stale files from past manual installs, which means the current
+  // bundle was never a valid candidate source.
   const bundle = convertClaudeToCopilot(plugin, {
     agentMode: "subagent",
     inferTemperature: true,
     permissions: "none",
   })
   const artifacts = getLegacyCopilotArtifacts(bundle)
-  const skillNames = new Set([
-    ...artifacts.skills,
-    ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
-    ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
-  ])
-  const agentPaths = new Set([
-    ...artifacts.agents,
-    ...bundle.agents.map((agent) => `${sanitizePathName(agent.name)}.agent.md`),
-  ])
   const managedDir = path.join(copilotRoot, "compound-engineering")
   let moved = 0
-  for (const skillName of skillNames) {
+  for (const skillName of artifacts.skills) {
     moved += await moveIfExists(managedDir, "skills", path.join(copilotRoot, "skills"), skillName, "Copilot")
   }
-  for (const agentPath of agentPaths) {
+  for (const agentPath of artifacts.agents) {
     moved += await moveIfExists(managedDir, "agents", path.join(copilotRoot, "agents"), agentPath, "Copilot")
   }
   return { target: "copilot", root: copilotRoot, moved }
@@ -513,6 +532,14 @@ function resolveWorkspaceRoot(value: unknown): string {
 
 function resolveCopilotWorkspaceRoot(outputRoot: string): string {
   return path.basename(outputRoot) === ".github" ? outputRoot : path.join(outputRoot, ".github")
+}
+
+function resolveGeminiWorkspaceRoot(outputRoot: string): string {
+  return path.basename(outputRoot) === ".gemini" ? outputRoot : path.join(outputRoot, ".gemini")
+}
+
+function hasExplicitValue(value: unknown): boolean {
+  return Boolean(value && String(value).trim())
 }
 
 function resolveDroidWorkspaceRoot(outputRoot: string): string {

@@ -344,6 +344,54 @@ describe("CLI", () => {
     expect(await exists(path.join(geminiRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
 
+  test("cleanup defaults Gemini root to workspace ./.gemini when --gemini-home is not set", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-gemini-default-"))
+    const workspaceRoot = path.join(tempRoot, "workspace")
+    const workspaceGemini = path.join(workspaceRoot, ".gemini")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    // Seed a legacy artifact in the WORKSPACE-scoped Gemini root (`<cwd>/.gemini`),
+    // which is where `install`/`convert` writes Gemini output by default.
+    // Cleanup must find this without `--gemini-home`, mirroring the install
+    // default.
+    await fs.mkdir(path.join(workspaceGemini, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(
+      path.join(workspaceGemini, "skills", "creating-agent-skills", "SKILL.md"),
+      "legacy deleted skill",
+    )
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "gemini",
+      "--output",
+      workspaceRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned gemini")
+    expect(await exists(path.join(workspaceGemini, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(workspaceGemini, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
   test("cleanup backs up legacy Copilot workspace artifacts for native migration", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-copilot-"))
     const repoRoot = path.join(import.meta.dir, "..")
@@ -351,10 +399,18 @@ describe("CLI", () => {
 
     await fs.mkdir(path.join(githubRoot, "skills", "git-commit-push-pr"), { recursive: true })
     await fs.writeFile(path.join(githubRoot, "skills", "git-commit-push-pr", "SKILL.md"), "legacy skill")
-    await fs.mkdir(path.join(githubRoot, "skills", "ce-plan"), { recursive: true })
-    await fs.writeFile(path.join(githubRoot, "skills", "ce-plan", "SKILL.md"), "current CE skill from old manual install")
     await fs.mkdir(path.join(githubRoot, "agents"), { recursive: true })
     await fs.writeFile(path.join(githubRoot, "agents", "repo-research-analyst.agent.md"), "legacy agent")
+
+    // User-authored artifacts whose names match current CE bundle output but
+    // are NOT on the historical allow-list. The Copilot writer has been
+    // removed (users now install via `copilot plugin install`), so these
+    // were never installed by CE — cleanup must leave them alone.
+    await fs.mkdir(path.join(githubRoot, "skills", "ce-debug"), { recursive: true })
+    await fs.writeFile(path.join(githubRoot, "skills", "ce-debug", "SKILL.md"), "user-authored skill")
+    await fs.mkdir(path.join(githubRoot, "skills", "my-user-skill"), { recursive: true })
+    await fs.writeFile(path.join(githubRoot, "skills", "my-user-skill", "SKILL.md"), "user-authored skill")
+    await fs.writeFile(path.join(githubRoot, "agents", "ce-adversarial-reviewer.agent.md"), "user-authored agent")
 
     const proc = Bun.spawn([
       "bun",
@@ -385,9 +441,14 @@ describe("CLI", () => {
 
     expect(stdout).toContain("Cleaned copilot")
     expect(await exists(path.join(githubRoot, "skills", "git-commit-push-pr"))).toBe(false)
-    expect(await exists(path.join(githubRoot, "skills", "ce-plan"))).toBe(false)
     expect(await exists(path.join(githubRoot, "agents", "repo-research-analyst.agent.md"))).toBe(false)
     expect(await exists(path.join(githubRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+
+    // User-authored files that only match current CE bundle names (not on
+    // the historical allow-list) must be left untouched.
+    expect(await exists(path.join(githubRoot, "skills", "ce-debug"))).toBe(true)
+    expect(await exists(path.join(githubRoot, "skills", "my-user-skill"))).toBe(true)
+    expect(await exists(path.join(githubRoot, "agents", "ce-adversarial-reviewer.agent.md"))).toBe(true)
   })
 
   test("cleanup backs up legacy Droid artifacts for native migration", async () => {
