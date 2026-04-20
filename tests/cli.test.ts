@@ -402,6 +402,15 @@ describe("CLI", () => {
     await fs.mkdir(path.join(droidRoot, "commands"), { recursive: true })
     await fs.writeFile(path.join(droidRoot, "commands", "plan.md"), "legacy flattened command")
 
+    // User-authored artifacts whose names match current CE bundle output (via
+    // the Droid converter) but are NOT on the historical allow-list. These
+    // must survive cleanup — the Droid writer was never wired up to install
+    // these, so sweeping them would be destructive.
+    await fs.writeFile(path.join(droidRoot, "droids", "ce-adversarial-reviewer.md"), "user-authored droid")
+    await fs.writeFile(path.join(droidRoot, "commands", "my-user-command.md"), "user-authored command")
+    await fs.mkdir(path.join(droidRoot, "skills", "my-user-skill"), { recursive: true })
+    await fs.writeFile(path.join(droidRoot, "skills", "my-user-skill", "SKILL.md"), "user-authored skill")
+
     const proc = Bun.spawn([
       "bun",
       "run",
@@ -434,6 +443,12 @@ describe("CLI", () => {
     expect(await exists(path.join(droidRoot, "droids", "bug-reproduction-validator.md"))).toBe(false)
     expect(await exists(path.join(droidRoot, "commands", "plan.md"))).toBe(false)
     expect(await exists(path.join(droidRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+
+    // User-authored files that only match current CE bundle names (not on the
+    // historical allow-list) must be left untouched.
+    expect(await exists(path.join(droidRoot, "droids", "ce-adversarial-reviewer.md"))).toBe(true)
+    expect(await exists(path.join(droidRoot, "commands", "my-user-command.md"))).toBe(true)
+    expect(await exists(path.join(droidRoot, "skills", "my-user-skill"))).toBe(true)
   })
 
   test("cleanup backs up deprecated Windsurf artifacts", async () => {

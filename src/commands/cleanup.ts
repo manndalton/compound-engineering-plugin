@@ -355,33 +355,28 @@ async function cleanupCopilot(plugin: Awaited<ReturnType<typeof loadClaudePlugin
 }
 
 async function cleanupDroid(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>, droidRoot: string): Promise<CleanupResult> {
+  // IMPORTANT: legacy detection for `~/.factory/{skills,droids,commands}` must
+  // be driven exclusively by the historical allow-list returned from
+  // `getLegacyDroidArtifacts` (see EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN). Mirrors
+  // the Codex cleanup fix: seeding candidates from the current plugin bundle
+  // would sweep up user-authored files at `~/.factory/commands/<name>.md`
+  // (or the skills/droids equivalents) that happen to share a name with a
+  // current CE artifact but were never installed by this plugin.
   const bundle = convertClaudeToDroid(plugin, {
     agentMode: "subagent",
     inferTemperature: true,
     permissions: "none",
   })
   const artifacts = getLegacyDroidArtifacts(bundle)
-  const skillNames = new Set([
-    ...artifacts.skills,
-    ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
-  ])
-  const droidPaths = new Set([
-    ...artifacts.droids,
-    ...bundle.droids.map((droid) => `${sanitizePathName(droid.name)}.md`),
-  ])
-  const commandPaths = new Set([
-    ...artifacts.commands,
-    ...bundle.commands.map((command) => `${sanitizePathName(command.name)}.md`),
-  ])
   const managedDir = path.join(droidRoot, "compound-engineering")
   let moved = 0
-  for (const skillName of skillNames) {
+  for (const skillName of artifacts.skills) {
     moved += await moveIfExists(managedDir, "skills", path.join(droidRoot, "skills"), skillName, "Droid")
   }
-  for (const droidPath of droidPaths) {
+  for (const droidPath of artifacts.droids) {
     moved += await moveIfExists(managedDir, "droids", path.join(droidRoot, "droids"), droidPath, "Droid")
   }
-  for (const commandPath of commandPaths) {
+  for (const commandPath of artifacts.commands) {
     moved += await moveIfExists(managedDir, "commands", path.join(droidRoot, "commands"), commandPath, "Droid")
   }
   return { target: "droid", root: droidRoot, moved }
