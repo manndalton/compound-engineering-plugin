@@ -3,6 +3,7 @@ import path from "path"
 import { ensureDir, pathExists, readText, sanitizePathName, writeJson } from "../utils/files"
 
 const MANAGED_INSTALL_MANIFEST = "install-manifest.json"
+const LEGACY_MANAGED_SEGMENT = "compound-engineering"
 
 export type ManagedInstallManifest = {
   version: 1
@@ -23,7 +24,74 @@ export function sanitizeManagedPluginName(name: string): string {
  * `compound-engineering` segment is returned to preserve pre-existing paths.
  */
 export function resolveManagedSegment(pluginName?: string): string {
-  return pluginName ?? "compound-engineering"
+  return pluginName ?? LEGACY_MANAGED_SEGMENT
+}
+
+/**
+ * Resolves the legacy shared managed directory that lived next to the
+ * current plugin-scoped directory before the per-plugin namespacing fix.
+ * `managedDir` is the plugin-scoped path (e.g. `<root>/coding-tutor`);
+ * the legacy sibling is `<root>/compound-engineering`. When `pluginName`
+ * is the historical `compound-engineering`, the legacy path and the
+ * current path are the same, so there is nothing to migrate -- this
+ * returns null in that case.
+ */
+export function resolveLegacyManagedDir(managedDir: string, pluginName: string): string | null {
+  if (pluginName === LEGACY_MANAGED_SEGMENT) return null
+  return path.join(path.dirname(managedDir), LEGACY_MANAGED_SEGMENT)
+}
+
+/**
+ * Reads the plugin-scoped install manifest, falling back to the legacy
+ * shared manifest at `<root>/compound-engineering/install-manifest.json`
+ * when the plugin-scoped one is missing. The legacy manifest is only
+ * returned when its recorded `pluginName` matches the current plugin --
+ * `readManagedInstallManifest` enforces that match, so a legacy manifest
+ * belonging to a different plugin is left untouched for that plugin's
+ * own next install to migrate.
+ */
+export async function readManagedInstallManifestWithLegacyFallback(
+  managedDir: string,
+  pluginName: string,
+): Promise<ManagedInstallManifest | null> {
+  const current = await readManagedInstallManifest(managedDir, pluginName)
+  if (current) return current
+  const legacyDir = resolveLegacyManagedDir(managedDir, pluginName)
+  if (!legacyDir) return null
+  return readManagedInstallManifest(legacyDir, pluginName)
+}
+
+/**
+ * After a plugin-scoped manifest has been written, archive the legacy
+ * shared manifest if it belongs to the current plugin, so the legacy
+ * path doesn't keep shadowing or misleading a future install. The
+ * legacy file is renamed into a timestamped backup under the new
+ * plugin-scoped managed dir rather than deleted outright, for parity
+ * with the `legacy-backup/` archival done for removed artifacts.
+ *
+ * If the legacy manifest does not exist, or it exists but is owned by
+ * a different plugin, this is a no-op.
+ */
+export async function archiveLegacyInstallManifestIfOwned(
+  managedDir: string,
+  pluginName: string,
+): Promise<void> {
+  const legacyDir = resolveLegacyManagedDir(managedDir, pluginName)
+  if (!legacyDir) return
+  const legacyManifestPath = path.join(legacyDir, MANAGED_INSTALL_MANIFEST)
+  if (!(await pathExists(legacyManifestPath))) return
+
+  // Only archive when the legacy manifest belongs to the current plugin;
+  // `readManagedInstallManifest` validates `pluginName` and returns null
+  // otherwise, so a null result means "not ours, leave it alone."
+  const owned = await readManagedInstallManifest(legacyDir, pluginName)
+  if (!owned) return
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+  const backupPath = path.join(managedDir, "legacy-backup", timestamp, MANAGED_INSTALL_MANIFEST)
+  await ensureDir(path.dirname(backupPath))
+  await fs.rename(legacyManifestPath, backupPath)
+  console.warn(`Moved legacy install manifest to ${backupPath}`)
 }
 
 export async function readManagedInstallManifest(

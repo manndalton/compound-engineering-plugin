@@ -449,6 +449,126 @@ describe("writeOpenCodeBundle", () => {
     expect(await exists(path.join(outputRoot, "commands", "report-bug.md"))).toBe(false)
     expect(await exists(path.join(outputRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
+
+  test("upgrades from pre-namespacing legacy shared manifest for non-CE plugins", async () => {
+    // Pre-namespacing, ALL plugins wrote their install manifest to the same
+    // shared path: `<root>/compound-engineering/install-manifest.json`. After
+    // the namespacing fix, a plugin like `coding-tutor` reads from its own
+    // scoped path (`<root>/coding-tutor/install-manifest.json`), which does
+    // not exist on the first reinstall after upgrade. Without a fallback, the
+    // manifest resolves to null and the writer skips cleanup, leaving stale
+    // files from the pre-namespacing install in place. This test exercises
+    // the fallback read of the legacy shared manifest.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-legacy-manifest-"))
+    const outputRoot = path.join(tempRoot, ".opencode")
+
+    // Seed the legacy shared manifest at the OLD path, recording artifacts
+    // that the previous coding-tutor install placed in the root.
+    await fs.mkdir(path.join(outputRoot, "compound-engineering"), { recursive: true })
+    await fs.writeFile(
+      path.join(outputRoot, "compound-engineering", "install-manifest.json"),
+      JSON.stringify({
+        version: 1,
+        pluginName: "coding-tutor",
+        groups: {
+          agents: ["stale-tutor-agent.md"],
+          commands: ["stale-tutor-cmd.md"],
+          plugins: [],
+          skills: ["stale-tutor-skill"],
+        },
+      }),
+    )
+
+    // Seed the stale artifacts on disk as they'd exist from the prior install.
+    await fs.mkdir(path.join(outputRoot, "agents"), { recursive: true })
+    await fs.writeFile(path.join(outputRoot, "agents", "stale-tutor-agent.md"), "stale")
+    await fs.mkdir(path.join(outputRoot, "commands"), { recursive: true })
+    await fs.writeFile(path.join(outputRoot, "commands", "stale-tutor-cmd.md"), "stale")
+    await fs.mkdir(path.join(outputRoot, "skills", "stale-tutor-skill"), { recursive: true })
+    await fs.writeFile(
+      path.join(outputRoot, "skills", "stale-tutor-skill", "SKILL.md"),
+      "stale",
+    )
+
+    // Reinstall coding-tutor with a new, non-overlapping set of artifacts.
+    await writeOpenCodeBundle(outputRoot, {
+      pluginName: "coding-tutor",
+      config: { $schema: "https://opencode.ai/config.json" },
+      agents: [{ name: "fresh-tutor-agent", content: "fresh" }],
+      plugins: [],
+      commandFiles: [],
+      skillDirs: [
+        {
+          name: "fresh-tutor-skill",
+          sourceDir: path.join(import.meta.dir, "fixtures", "sample-plugin", "skills", "skill-one"),
+        },
+      ],
+    })
+
+    // Stale artifacts from the legacy manifest must be cleaned up.
+    expect(await exists(path.join(outputRoot, "agents", "stale-tutor-agent.md"))).toBe(false)
+    expect(await exists(path.join(outputRoot, "commands", "stale-tutor-cmd.md"))).toBe(false)
+    expect(await exists(path.join(outputRoot, "skills", "stale-tutor-skill"))).toBe(false)
+
+    // Fresh artifacts must be written under the plugin-scoped manifest path.
+    expect(await exists(path.join(outputRoot, "agents", "fresh-tutor-agent.md"))).toBe(true)
+    expect(await exists(path.join(outputRoot, "skills", "fresh-tutor-skill", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(outputRoot, "coding-tutor", "install-manifest.json"))).toBe(true)
+
+    // The legacy shared manifest must be archived so it doesn't keep
+    // misleading a future install (and must no longer exist at the old path).
+    expect(await exists(path.join(outputRoot, "compound-engineering", "install-manifest.json"))).toBe(false)
+    expect(await exists(path.join(outputRoot, "coding-tutor", "legacy-backup"))).toBe(true)
+  })
+
+  test("leaves legacy shared manifest alone when it belongs to a different plugin", async () => {
+    // Reinforces the cross-plugin safety: a legacy manifest owned by plugin
+    // A must not be consumed or cleaned up by plugin B's first namespaced
+    // install. Plugin A's own next install is responsible for migrating it.
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-legacy-other-plugin-"))
+    const outputRoot = path.join(tempRoot, ".opencode")
+
+    await fs.mkdir(path.join(outputRoot, "compound-engineering"), { recursive: true })
+    const legacyManifest = {
+      version: 1,
+      pluginName: "some-other-plugin",
+      groups: {
+        agents: ["other-plugin-agent.md"],
+        commands: [],
+        plugins: [],
+        skills: [],
+      },
+    }
+    await fs.writeFile(
+      path.join(outputRoot, "compound-engineering", "install-manifest.json"),
+      JSON.stringify(legacyManifest),
+    )
+    await fs.mkdir(path.join(outputRoot, "agents"), { recursive: true })
+    await fs.writeFile(path.join(outputRoot, "agents", "other-plugin-agent.md"), "other")
+
+    await writeOpenCodeBundle(outputRoot, {
+      pluginName: "coding-tutor",
+      config: { $schema: "https://opencode.ai/config.json" },
+      agents: [{ name: "tutor-agent", content: "tutor" }],
+      plugins: [],
+      commandFiles: [],
+      skillDirs: [],
+    })
+
+    // Other plugin's artifact is left alone.
+    expect(await exists(path.join(outputRoot, "agents", "other-plugin-agent.md"))).toBe(true)
+    // Other plugin's legacy manifest is left at the legacy path.
+    expect(
+      await exists(path.join(outputRoot, "compound-engineering", "install-manifest.json")),
+    ).toBe(true)
+    const preserved = JSON.parse(
+      await fs.readFile(
+        path.join(outputRoot, "compound-engineering", "install-manifest.json"),
+        "utf8",
+      ),
+    )
+    expect(preserved.pluginName).toBe("some-other-plugin")
+  })
 })
 
 describe("mergeJsonConfigAtKey", () => {

@@ -140,12 +140,11 @@ describe("plugin legacy artifacts", () => {
     expect(artifacts.agents).not.toContain("ce-repo-research-analyst")
   })
 
-  test("includes current and historical CE artifacts for deprecated Windsurf cleanup", async () => {
+  test("includes only historical CE artifacts for deprecated Windsurf cleanup", async () => {
     const plugin = await loadClaudePlugin(path.join(import.meta.dir, "..", "plugins", "compound-engineering"))
 
     const artifacts = getLegacyWindsurfArtifacts(plugin)
 
-    expect(artifacts.skills).toContain("ce-plan")
     expect(artifacts.skills).toContain("ce-review")
     expect(artifacts.skills).toContain("creating-agent-skills")
     expect(artifacts.skills).toContain("reproduce-bug")
@@ -158,5 +157,10 @@ describe("plugin legacy artifacts", () => {
     expect(artifacts.workflows).toContain("workflows-plan.md")
     expect(artifacts.workflows).toContain("ce-plan.md")
     expect(artifacts.workflows).toContain("technical_review.md")
+
+    // Names present in the current CE bundle but NOT on the historical
+    // allow-list must never be cleanup candidates, so user-authored files at
+    // those paths survive `cleanup --target windsurf`.
+    expect(artifacts.skills).not.toContain("ce-debug")
   })
 })

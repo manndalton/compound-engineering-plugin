@@ -4,11 +4,12 @@ import { transformSkillContentForOpenCode } from "../converters/claude-to-openco
 import type { OpenCodeBundle, OpenCodeConfig } from "../types/opencode"
 import { getLegacyOpenCodeArtifacts } from "../data/plugin-legacy-artifacts"
 import {
+  archiveLegacyInstallManifestIfOwned,
   cleanupCurrentManagedDirectory,
   cleanupRemovedManagedDirectories,
   cleanupRemovedManagedFiles,
   moveLegacyArtifactToBackup,
-  readManagedInstallManifest,
+  readManagedInstallManifestWithLegacyFallback,
   resolveManagedSegment,
   sanitizeManagedPluginName,
   writeManagedInstallManifest,
@@ -61,7 +62,9 @@ async function mergeOpenCodeConfig(
 export async function writeOpenCodeBundle(outputRoot: string, bundle: OpenCodeBundle): Promise<void> {
   const pluginName = bundle.pluginName ? sanitizeManagedPluginName(bundle.pluginName) : undefined
   const openCodePaths = resolveOpenCodePaths(outputRoot, pluginName)
-  const manifest = pluginName ? await readManagedInstallManifest(openCodePaths.managedDir, pluginName) : null
+  const manifest = pluginName
+    ? await readManagedInstallManifestWithLegacyFallback(openCodePaths.managedDir, pluginName)
+    : null
   const currentAgents = bundle.agents.map((agent) => `${sanitizePathName(agent.name)}.md`)
   const currentCommands = bundle.commandFiles.map((commandFile) => `${commandFile.name.split(":").join("/")}.md`)
   const currentPlugins = bundle.plugins.map((plugin) => plugin.name)
@@ -135,6 +138,7 @@ export async function writeOpenCodeBundle(outputRoot: string, bundle: OpenCodeBu
         skills: currentSkills,
       },
     })
+    await archiveLegacyInstallManifestIfOwned(openCodePaths.managedDir, pluginName)
     await cleanupKnownLegacyOpenCodeArtifacts(openCodePaths, bundle)
   }
 }

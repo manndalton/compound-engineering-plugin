@@ -4,11 +4,12 @@ import { transformContentForGemini } from "../converters/claude-to-gemini"
 import type { GeminiBundle } from "../types/gemini"
 import { getLegacyGeminiArtifacts } from "../data/plugin-legacy-artifacts"
 import {
+  archiveLegacyInstallManifestIfOwned,
   cleanupCurrentManagedDirectory,
   cleanupRemovedManagedDirectories,
   cleanupRemovedManagedFiles,
   moveLegacyArtifactToBackup,
-  readManagedInstallManifest,
+  readManagedInstallManifestWithLegacyFallback,
   resolveManagedSegment,
   sanitizeManagedPluginName,
   writeManagedInstallManifest,
@@ -17,7 +18,9 @@ import {
 export async function writeGeminiBundle(outputRoot: string, bundle: GeminiBundle): Promise<void> {
   const pluginName = bundle.pluginName ? sanitizeManagedPluginName(bundle.pluginName) : undefined
   const paths = resolveGeminiPaths(outputRoot, pluginName)
-  const manifest = pluginName ? await readManagedInstallManifest(paths.managedDir, pluginName) : null
+  const manifest = pluginName
+    ? await readManagedInstallManifestWithLegacyFallback(paths.managedDir, pluginName)
+    : null
   const currentSkills = [
     ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
     ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
@@ -96,6 +99,7 @@ export async function writeGeminiBundle(outputRoot: string, bundle: GeminiBundle
         commands: currentCommands,
       },
     })
+    await archiveLegacyInstallManifestIfOwned(paths.managedDir, pluginName)
     await cleanupKnownLegacyGeminiArtifacts(paths, bundle)
   }
 }

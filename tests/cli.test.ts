@@ -463,6 +463,16 @@ describe("CLI", () => {
     await fs.mkdir(path.join(windsurfRoot, "global_workflows"), { recursive: true })
     await fs.writeFile(path.join(windsurfRoot, "global_workflows", "workflows-plan.md"), "legacy workflow")
 
+    // User-authored artifacts whose names match current CE bundle output but
+    // are NOT on the historical allow-list. Windsurf's writer has been
+    // removed, so these were never installed by CE — cleanup must leave them
+    // alone.
+    await fs.mkdir(path.join(windsurfRoot, "skills", "ce-debug"), { recursive: true })
+    await fs.writeFile(path.join(windsurfRoot, "skills", "ce-debug", "SKILL.md"), "user-authored skill")
+    await fs.mkdir(path.join(windsurfRoot, "skills", "my-user-skill"), { recursive: true })
+    await fs.writeFile(path.join(windsurfRoot, "skills", "my-user-skill", "SKILL.md"), "user-authored skill")
+    await fs.writeFile(path.join(windsurfRoot, "global_workflows", "my-user-workflow.md"), "user-authored workflow")
+
     const proc = Bun.spawn([
       "bun",
       "run",
@@ -495,6 +505,12 @@ describe("CLI", () => {
     expect(await exists(path.join(windsurfRoot, "skills", "repo-research-analyst"))).toBe(false)
     expect(await exists(path.join(windsurfRoot, "global_workflows", "workflows-plan.md"))).toBe(false)
     expect(await exists(path.join(windsurfRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+
+    // User-authored files that only match current CE bundle names (not on
+    // the historical allow-list) must be left untouched.
+    expect(await exists(path.join(windsurfRoot, "skills", "ce-debug"))).toBe(true)
+    expect(await exists(path.join(windsurfRoot, "skills", "my-user-skill"))).toBe(true)
+    expect(await exists(path.join(windsurfRoot, "global_workflows", "my-user-workflow.md"))).toBe(true)
   })
 
   test("cleanup backs up legacy Qwen Bun artifacts for native migration", async () => {

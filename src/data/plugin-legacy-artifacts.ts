@@ -527,19 +527,27 @@ export function getLegacyCopilotArtifacts(bundle: CopilotBundle): LegacyCopilotA
 }
 
 export function getLegacyWindsurfArtifacts(plugin: ClaudePlugin): LegacyWindsurfArtifacts {
+  // IMPORTANT: legacy detection for Windsurf roots must be driven exclusively
+  // by the explicit historical allow-list in `EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN`.
+  //
+  // Earlier versions of this function also seeded candidates from the current
+  // plugin bundle (`plugin.skills`, `plugin.agents`, `plugin.commands`). That
+  // was unsafe: the Windsurf writer has since been removed, so the only
+  // purpose of this cleanup is backing up stale files from past installs.
+  // Any user-authored skill/workflow at a flat Windsurf path that happened to
+  // share a name with a current CE skill/agent/command (e.g.
+  // `skills/ce-debug` or `global_workflows/ce-plan.md`) would otherwise be
+  // swept into `compound-engineering/legacy-backup` even though it was never
+  // installed by CE.
+  //
+  // The historical allow-list already enumerates every skill/agent/command
+  // name CE has ever shipped (including names that are still current), so
+  // restricting detection to that list still cleans up real legacy installs
+  // without touching unrelated user content. If the allow-list is empty for
+  // this plugin, Windsurf cleanup is a no-op — the correct safety default.
   const skills = new Set<string>()
   const workflows = new Set<string>()
   const extras = getLegacyPluginArtifacts(plugin.manifest.name)
-
-  for (const skill of plugin.skills) {
-    skills.add(sanitizePathName(skill.name))
-  }
-  for (const agent of plugin.agents) {
-    skills.add(normalizeLegacyName(agent.name))
-  }
-  for (const command of plugin.commands) {
-    workflows.add(`${normalizeLegacyName(command.name)}.md`)
-  }
 
   for (const name of extras.skills ?? []) {
     skills.add(sanitizePathName(name))

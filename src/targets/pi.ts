@@ -14,7 +14,7 @@ import { transformContentForPi } from "../converters/claude-to-pi"
 import type { PiBundle } from "../types/pi"
 import { getLegacyPiArtifacts } from "../data/plugin-legacy-artifacts"
 import { cleanupStaleAgents } from "../utils/legacy-cleanup"
-import { resolveManagedSegment } from "./managed-artifacts"
+import { resolveLegacyManagedDir, resolveManagedSegment } from "./managed-artifacts"
 
 const PI_AGENTS_BLOCK_START = "<!-- BEGIN COMPOUND PI TOOL MAP -->"
 const PI_AGENTS_BLOCK_END = "<!-- END COMPOUND PI TOOL MAP -->"
@@ -52,7 +52,9 @@ type PiPaths = {
 export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promise<void> {
   const pluginName = bundle.pluginName ? sanitizeCodexPathComponent(bundle.pluginName) : undefined
   const paths = resolvePiPaths(outputRoot, pluginName)
-  const manifest = pluginName ? await readInstallManifest(paths.managedDir, pluginName) : null
+  const manifest = pluginName
+    ? await readInstallManifestWithLegacyFallback(paths.managedDir, pluginName)
+    : null
   const currentPrompts = bundle.prompts.map((prompt) => `${sanitizePathName(prompt.name)}.md`)
   const currentSkills = [
     ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
@@ -109,6 +111,7 @@ export async function writePiBundle(outputRoot: string, bundle: PiBundle): Promi
       prompts: currentPrompts,
       extensions: currentExtensions,
     })
+    await archiveLegacyInstallManifestIfOwned(paths.managedDir, pluginName)
     await cleanupKnownLegacyPiArtifacts(paths, bundle)
   }
 }
@@ -191,6 +194,43 @@ function upsertBlock(existing: string, block: string): string {
 
 function sanitizeCodexPathComponent(name: string): string {
   return sanitizePathName(name).replace(/[\\/]/g, "-")
+}
+
+async function readInstallManifestWithLegacyFallback(
+  managedDir: string,
+  pluginName: string,
+): Promise<PiInstallManifest | null> {
+  const current = await readInstallManifest(managedDir, pluginName)
+  if (current) return current
+  const legacyDir = resolveLegacyManagedDir(managedDir, pluginName)
+  if (!legacyDir) return null
+  return readInstallManifest(legacyDir, pluginName)
+}
+
+/**
+ * After the plugin-scoped Pi manifest is written, archive the legacy
+ * shared Pi manifest if it belongs to the current plugin so the legacy
+ * path doesn't keep shadowing a future install. No-op when the legacy
+ * manifest is missing or owned by a different plugin (that plugin's
+ * own next install will migrate it).
+ */
+async function archiveLegacyInstallManifestIfOwned(
+  managedDir: string,
+  pluginName: string,
+): Promise<void> {
+  const legacyDir = resolveLegacyManagedDir(managedDir, pluginName)
+  if (!legacyDir) return
+  const legacyManifestPath = path.join(legacyDir, PI_INSTALL_MANIFEST)
+  if (!(await pathExists(legacyManifestPath))) return
+
+  const owned = await readInstallManifest(legacyDir, pluginName)
+  if (!owned) return
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+  const backupPath = path.join(managedDir, "legacy-backup", timestamp, PI_INSTALL_MANIFEST)
+  await ensureDir(path.dirname(backupPath))
+  await fs.rename(legacyManifestPath, backupPath)
+  console.warn(`Moved legacy Pi install manifest to ${backupPath}`)
 }
 
 async function readInstallManifest(managedDir: string, pluginName: string): Promise<PiInstallManifest | null> {
