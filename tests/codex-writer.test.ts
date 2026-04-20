@@ -79,6 +79,38 @@ describe("writeCodexBundle", () => {
     expect(config).toContain("http_headers")
   })
 
+  test("throws when two agents sanitize to the same Codex filename", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-agent-collision-"))
+    const bundle: CodexBundle = {
+      prompts: [],
+      skillDirs: [],
+      generatedSkills: [],
+      agents: [
+        {
+          name: "research:ce-learnings-researcher",
+          description: "First",
+          instructions: "First agent body.",
+        },
+        {
+          name: "research-ce-learnings-researcher",
+          description: "Second",
+          instructions: "Second agent body.",
+        },
+      ],
+    }
+
+    await expect(writeCodexBundle(tempRoot, bundle)).rejects.toThrow(
+      /Codex agent filename collision/,
+    )
+
+    // Verify neither agent was silently dropped: the first agent should not have
+    // been written before the collision was detected (guard runs before writes).
+    const agentsRoot = path.join(tempRoot, ".codex", "agents")
+    expect(
+      await exists(path.join(agentsRoot, "research-ce-learnings-researcher.toml")),
+    ).toBe(false)
+  })
+
   test("writes directly into a .codex output root", async () => {
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "codex-home-"))
     const codexRoot = path.join(tempRoot, ".codex")

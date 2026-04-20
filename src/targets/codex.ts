@@ -34,6 +34,7 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
     ? path.join(codexRoot, "agents", pluginName)
     : path.join(codexRoot, "agents")
   const currentAgents = agents.map((agent) => `${sanitizePathName(agent.name)}.toml`)
+  assertNoCodexAgentFilenameCollisions(agents)
 
   if (bundle.prompts.length > 0) {
     const promptsDir = path.join(codexRoot, "prompts")
@@ -467,6 +468,25 @@ function escapeForRegex(value: string): string {
 
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
+}
+
+function assertNoCodexAgentFilenameCollisions(
+  agents: NonNullable<CodexBundle["agents"]>,
+): void {
+  const seen = new Map<string, string>()
+  for (const agent of agents) {
+    const filename = `${sanitizePathName(agent.name)}.toml`
+    const prior = seen.get(filename)
+    if (prior !== undefined && prior !== agent.name) {
+      throw new Error(
+        `Codex agent filename collision: "${prior}" and "${agent.name}" both normalize to ` +
+          `"${filename}". Rename one of the source agents so their sanitized filenames differ. ` +
+          `A numeric suffix cannot be used here because the TOML filename must match the ` +
+          `agent name used for Task(subagent_type: ...) invocations.`,
+      )
+    }
+    seen.set(filename, agent.name)
+  }
 }
 
 function renderCodexAgentToml(agent: NonNullable<CodexBundle["agents"]>[number]): string {
