@@ -16,6 +16,7 @@ tags:
   - install-strategy
   - native-plugins
   - legacy-cleanup
+  - cursor
   - codex
   - copilot
   - droid
@@ -36,12 +37,15 @@ This document records the intended install model by harness. The current priorit
 | Harness | Intended install path | Custom Bun install? | Legacy cleanup needed? | Notes |
 | --- | --- | --- | --- | --- |
 | Claude Code | Native plugin marketplace using existing `.claude-plugin/marketplace.json` and `plugins/compound-engineering/.claude-plugin/plugin.json` | No | Only for old/manual non-native installs, if any | Current repo shape already satisfies Claude Code. |
+| Cursor | Native Cursor Plugin Marketplace using existing `.cursor-plugin/marketplace.json` and `plugins/compound-engineering/.cursor-plugin/plugin.json` | No, CE plugin install/convert target removed | No for marketplace installs; add targeted cleanup only if historical custom Cursor artifacts are confirmed | Users install from Cursor Agent chat with `/add-plugin compound-engineering` or by searching the plugin marketplace. |
 | GitHub Copilot CLI | Native plugin marketplace using the same existing `.claude-plugin` metadata | No, CE plugin install/convert target removed | Yes, before or during migration from previous `.github/` custom installs | Tested manually: Copilot can install from the existing CE marketplace and load agents. |
 | Factory Droid | Native plugin marketplace pointed at the CE GitHub repository | No, CE plugin install/convert target removed | Yes, before or during migration from previous `~/.factory` custom installs | Droid docs say Claude Code plugins install directly and are translated automatically; `ce-doc-review` was manually tested in Droid. |
 | Qwen Code | Native extension install from the CE GitHub repository and existing Claude plugin metadata | No, CE plugin install/convert target removed | Yes, before or during migration from previous `~/.qwen` custom installs | Qwen docs say Claude Code extensions install directly from GitHub and are converted automatically; native install was manually tested on 2026-04-19. |
 | OpenCode | Custom CE install to `~/.config/opencode/{skills,agents,plugins}` plus merged `opencode.json`; source commands are written only if present | Yes | Yes, every install | OpenCode plugins are JS/TS or npm hooks/tools, not a Claude-compatible marketplace install path for CE's full plugin payload. |
-| Codex | Custom CE install to `~/.codex/skills/compound-engineering/<skill>` | Yes, until Codex has a simple distributed plugin marketplace/install flow | Yes, every install | Avoid `~/.agents/skills` so Codex installs do not shadow Copilot's native plugin skills. Current output converts Claude agents into generated Codex skills; TOML custom agents remain a future migration option. |
+| Pi | Custom CE install to `~/.pi/agent/{skills,prompts,extensions}` plus MCPorter config; source commands are written only if present | Yes, until CE ships and tests a Pi package | Yes, every install | Pi has package install support, but CE has not yet packaged the compat extension, generated skills, prompts, and MCPorter config into a tested Pi package. |
+| Codex | Custom CE install to `~/.codex/skills/compound-engineering/<skill>` and `~/.codex/agents/compound-engineering/<agent>.toml` | Yes, because native Codex plugins do not currently register bundled custom agents | Yes, every install | Avoid `~/.agents/skills` so Codex installs do not shadow Copilot's native plugin skills. Claude agents are converted to Codex TOML custom agents. |
 | Gemini CLI | Custom CE install to `~/.gemini/{skills,agents}` for now; source commands are written only if present; native extension packaging exists but does not fit CE's current repo/package layout | Yes, until CE ships a Gemini extension root, release artifact, or dedicated distribution branch/repo | Yes, every install | Avoid `~/.agents/skills`; write normalized Gemini agents to `~/.gemini/agents`. |
+| Kiro CLI | Custom CE install to project `.kiro/{skills,agents,steering,settings}` | Yes | Yes, every install; manual `cleanup --target kiro` also exists | Kiro has its own JSON agent format and project-local install root. |
 
 Deprecated targets:
 
@@ -70,14 +74,20 @@ OpenCode: ~/.config/opencode/skills/<skill>/SKILL.md
           ~/.config/opencode/commands/*.md  # source commands only, if present
           ~/.config/opencode/opencode.json
 
+Pi:       ~/.pi/agent/skills/<skill>/SKILL.md
+          ~/.pi/agent/prompts/*.md  # source commands only, if present
+          ~/.pi/agent/extensions/*.ts
+          ~/.pi/agent/compound-engineering/mcporter.json
+
 Codex:  ~/.codex/skills/compound-engineering/<skill>/SKILL.md
-        Future option: ~/.codex/agents/<ce-agent>.toml
+        ~/.codex/agents/compound-engineering/<agent>.toml
 
 Gemini: ~/.gemini/skills/<skill>/SKILL.md
         ~/.gemini/agents/<agent>.md
         ~/.gemini/commands/*.toml  # source commands only, if present
 
 Copilot: managed by native plugin install under ~/.copilot
+Cursor:  managed by native Cursor Plugin Marketplace install
 Droid:   managed by native plugin install under ~/.factory for user scope
 Qwen:    managed by native extension install under ~/.qwen
 ```
@@ -107,6 +117,34 @@ No custom Bun install or conversion should be used for Claude Code.
 ### Cleanup
 
 Native Claude plugin installs are owned by Claude Code. The CE cleanup command should not delete Claude Code's plugin cache. It should only handle explicitly known old/manual CE artifacts if we discover any historical non-native Claude install path.
+
+## Cursor
+
+### Decision
+
+Cursor should use the native Cursor Plugin Marketplace, not `bunx @every-env/compound-plugin install compound-engineering --to cursor`.
+The custom Cursor plugin install/convert target has been removed from the CLI target registry.
+
+The repo publishes Cursor marketplace metadata separately from the Claude marketplace:
+
+- Root marketplace: `.cursor-plugin/marketplace.json`
+- Plugin manifest: `plugins/compound-engineering/.cursor-plugin/plugin.json`
+
+Users install from Cursor Agent chat with:
+
+```text
+/add-plugin compound-engineering
+```
+
+They can also search for "compound engineering" in the plugin marketplace.
+
+No custom Bun install or conversion should be used for Cursor.
+
+### Cleanup
+
+Cursor marketplace installs are owned by Cursor. CE should not delete Cursor's plugin marketplace cache.
+
+If we discover historical CE-owned Cursor artifacts from the old custom writer that can shadow marketplace installs, add a targeted cleanup path for those known artifacts. Do not reintroduce Cursor as an active `convert` or `install` target.
 
 ## GitHub Copilot CLI
 
@@ -277,6 +315,57 @@ The OpenCode custom writer should continue to track and clean CE-owned files on 
 - Old CE-owned shared skills under `~/.agents/skills/*` from previous experiments or installs
 - Manifest-tracked files that disappeared because a skill, agent, or command was renamed or removed
 
+## Pi
+
+### Current Platform Facts
+
+Pi supports file-based skills and package installs. Its package surface can bundle skills, prompts, extensions, and related package metadata, and `pi install` can install from package sources such as npm, git, URLs, or local paths.
+
+Pi also has shared skill discovery through `~/.agents/skills` and `.agents/skills`, but CE should not use those shared roots for the same reason as OpenCode, Codex, and Gemini: Copilot can read shared personal/project skills before plugin skills, so a CE skill installed there for Pi could shadow Copilot's native plugin install.
+
+CE's current Pi compatibility is not a raw Claude-compatible plugin install. The converter currently:
+
+- Copies platform-compatible CE skills.
+- Converts Claude agents into generated Pi skills, because Pi does not provide a Claude-style plugin `agents/` runtime equivalent for this payload today.
+- Writes a `compound-engineering-compat.ts` extension that provides compatibility tools such as subagent invocation and MCPorter access.
+- Converts Claude MCP server config into `compound-engineering/mcporter.json` for MCPorter.
+- Writes source commands as prompts only if a source plugin ships commands.
+
+### Decision
+
+Keep the custom CE Pi writer for now:
+
+```text
+~/.pi/agent/skills/<skill-name>/SKILL.md
+~/.pi/agent/prompts/*.md
+~/.pi/agent/extensions/compound-engineering-compat.ts
+~/.pi/agent/compound-engineering/mcporter.json
+~/.pi/agent/compound-engineering/install-manifest.json
+~/.pi/agent/AGENTS.md  # CE-managed compatibility block
+```
+
+This is a pragmatic install target, not the desired long-term distribution shape. The long-term direction should be a real Pi package that can be installed with `pi install`, but CE should not promote that as the primary path until we package and test the full payload: copied skills, generated agent skills, prompts, the compatibility extension, MCPorter config, and cleanup behavior.
+
+Do not install CE Pi artifacts into `~/.agents/skills`.
+
+### Cleanup
+
+The Pi custom writer should continue to track and clean CE-owned files on every install:
+
+- Old CE-owned `~/.pi/agent/skills/*`
+- Old CE-owned `~/.pi/agent/prompts/*`
+- Old CE-owned `~/.pi/agent/extensions/*`
+- Old generated agent-as-skill artifacts from prior CE installs
+- Manifest-tracked files that disappeared because a skill, prompt, generated agent skill, or extension was renamed or removed
+
+Manual cleanup is also available:
+
+```bash
+bunx @every-env/compound-plugin cleanup --target pi
+```
+
+Future Pi package work should preserve the same cleanup semantics before switching users from the current custom writer to a native `pi install` package.
+
 ## Codex
 
 ### Current Platform Facts
@@ -360,6 +449,7 @@ For Codex, `~/.codex` is the durable source of truth for CE-owned Codex artifact
 
 ```text
 ~/.codex/skills/compound-engineering/<skill-name>/SKILL.md
+~/.codex/agents/compound-engineering/<agent-name>.toml
 ~/.codex/compound-engineering/install-manifest.json
 ```
 
@@ -372,13 +462,11 @@ For now:
 - Keep a custom CE Codex install path.
 - Run legacy cleanup on every custom Codex install.
 - Install generated/converted skills under `~/.codex/skills/compound-engineering/<skill-name>/SKILL.md`.
-- Continue converting Claude Markdown agents to generated Codex skills in this branch.
-- Treat flat Codex custom-agent TOML files under `~/.codex/agents/<ce-agent-name>.toml` as a follow-up migration option, not current output.
-- If that migration lands, use direct `~/.codex/agents/*.toml` files because current Codex docs describe one standalone TOML file per agent under `~/.codex/agents/` or `.codex/agents/`; do not assume nested agent directories are discovered.
-- If that migration lands, name converted agents with a CE/category prefix, for example `ce-review-correctness-reviewer` or `ce-research-repo-research-analyst`, and rewrite skill orchestration text to spawn those names.
-- Track generated skills in `~/.codex/compound-engineering/install-manifest.json`; extend the manifest for generated agents only if TOML custom-agent output is implemented.
-- Keep Codex-only artifacts under `~/.codex`, such as prompt wrappers, `config.toml` MCP entries, and any future Codex TOML custom agents.
-- Keep current `Task`/agent reference rewrites pointed at generated Codex skills until a TOML custom-agent migration is implemented.
+- Convert Claude Markdown agents to Codex TOML custom agents under `~/.codex/agents/compound-engineering/<agent-name>.toml`.
+- Name converted agents with the source category and CE agent name, for example `review-ce-correctness-reviewer` or `research-ce-repo-research-analyst`, and rewrite skill orchestration text to spawn those names.
+- Track generated skills, prompts, and agents in `~/.codex/compound-engineering/install-manifest.json`.
+- Keep Codex-only artifacts under `~/.codex`, such as prompt wrappers, `config.toml` MCP entries, and Codex TOML custom agents.
+- Rewrite `Task`/agent references to spawn generated Codex custom agents when the referenced agent is known.
 - Track an install manifest so removed skills and renamed skills can be cleaned later.
 - Track historical CE artifacts from git history so old flat installs, prompt files, and converted-agent skills can be cleaned safely.
 
@@ -400,6 +488,24 @@ CODEX_TOML_AGENT_SMOKE_OK
 ```
 
 This confirms the intended CE Codex architecture is viable: workflow skills can invoke Claude-authored agents converted to Codex TOML custom agents in `~/.codex/agents`. The skill root should now be moved from the tested `~/.agents/skills` path to the isolated CE path under `~/.codex/skills/compound-engineering`.
+
+On 2026-04-19, we also verified that Codex discovers nested TOML custom agents under:
+
+```text
+~/.codex/agents/compound-engineering/<agent-name>.toml
+```
+
+and accepts hyphenated TOML `name` values such as `ce-codex-hyphen-toml-smoke`. CE should therefore use the nested `compound-engineering` agent root for cleanup parity with `~/.codex/skills/compound-engineering/`.
+
+We also tested Codex native plugin-bundled agents in three shapes:
+
+```text
+plugins/<plugin>/agents/<agent>.toml
+plugins/<plugin>/.codex/agents/<agent>.toml
+plugins/<plugin>/.codex-plugin/plugin.json with "agents": "./agents/"
+```
+
+All installed plugin skills loaded, but spawning the bundled custom agents failed with `unknown agent_type`. Codex native plugins are therefore not a sufficient CE install path for agent-heavy workflows yet.
 
 On the same day, we verified duplicate discovery behavior by installing two skills with the same `name`:
 
@@ -436,13 +542,11 @@ But CE should no longer install there because Copilot plugin skills can be shado
 
 ### Future Codex Plugin Option
 
-Revisit Codex native plugins when one of these becomes true:
+Codex now has a documented marketplace/plugin install path, including `codex marketplace add <source>`, but CE should not use it as the primary Codex install path yet because plugin-bundled custom agents did not register in testing.
 
-- Official public plugin directory publishing is available.
-- Codex supports a simple remote GitHub marketplace install flow comparable to Copilot.
-- We decide that a documented "copy marketplace.json into `~/.agents/plugins` and install from the directory" flow is acceptable for CE users.
+Revisit Codex native plugins when Codex documents and supports plugin-bundled custom agents, or when the plugin installer can declare files that should be installed into the user's custom-agent roots.
 
-Until then, Codex native plugins are useful for local development and testing, but not the primary user install path.
+Until then, Codex native plugins are useful for local development and testing skill-only packages, but not for CE's agent-heavy workflows.
 
 ## Gemini CLI
 
@@ -558,7 +662,9 @@ Cleanup should cover:
 ## Sources
 
 - Claude/Copilot marketplace metadata: `.claude-plugin/marketplace.json`
+- Cursor marketplace metadata: `.cursor-plugin/marketplace.json`
 - Claude plugin manifest: `plugins/compound-engineering/.claude-plugin/plugin.json`
+- Cursor plugin manifest: `plugins/compound-engineering/.cursor-plugin/plugin.json`
 - Copilot plugin reference: `https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference`
 - Copilot CLI plugins overview: `https://docs.github.com/en/copilot/concepts/agents/copilot-cli/about-cli-plugins`
 - Factory Droid plugin configuration: `https://docs.factory.ai/cli/configuration/plugins`
@@ -568,6 +674,8 @@ Cleanup should cover:
 - OpenCode agents: `https://opencode.ai/docs/agents/`
 - OpenCode commands: `https://opencode.ai/docs/commands/`
 - OpenCode plugins: `https://opencode.ai/docs/plugins/`
+- Pi overview: `https://buildwithpi.ai/README.md`
+- Pi skills/packages: `https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/skills.md`, `https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md`
 - Codex skills: `https://developers.openai.com/codex/skills`
 - Codex plugin build/distribution docs: `https://developers.openai.com/codex/plugins/build`
 - Superpowers Codex install guide: `https://github.com/obra/superpowers/blob/main/.codex/INSTALL.md`

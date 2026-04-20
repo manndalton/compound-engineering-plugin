@@ -37,6 +37,13 @@ describe("writeCodexBundle", () => {
         },
       ],
       generatedSkills: [{ name: "agent-skill", content: "Skill content" }],
+      agents: [
+        {
+          name: "research-ce-repo-research-analyst",
+          description: "Repo research",
+          instructions: "Research the repository.",
+        },
+      ],
       mcpServers: {
         local: { command: "echo", args: ["hello"], env: { KEY: "VALUE" } },
         remote: {
@@ -51,6 +58,11 @@ describe("writeCodexBundle", () => {
     expect(await exists(path.join(tempRoot, ".codex", "prompts", "command-one.md"))).toBe(true)
     expect(await exists(path.join(tempRoot, ".codex", "skills", "skill-one", "SKILL.md"))).toBe(true)
     expect(await exists(path.join(tempRoot, ".codex", "skills", "agent-skill", "SKILL.md"))).toBe(true)
+    const agentPath = path.join(tempRoot, ".codex", "agents", "research-ce-repo-research-analyst.toml")
+    expect(await exists(agentPath)).toBe(true)
+    const agentToml = await fs.readFile(agentPath, "utf8")
+    expect(agentToml).toContain('name = "research-ce-repo-research-analyst"')
+    expect(agentToml).toContain('developer_instructions = "Research the repository."')
     const configPath = path.join(tempRoot, ".codex", "config.toml")
     expect(await exists(configPath)).toBe(true)
 
@@ -146,14 +158,17 @@ describe("writeCodexBundle", () => {
           sourceDir: path.join(import.meta.dir, "fixtures", "sample-plugin", "skills", "skill-one"),
         },
       ],
-      generatedSkills: [{ name: "old-agent", content: "Old agent" }],
+      generatedSkills: [{ name: "old-command", content: "Old command" }],
+      agents: [{ name: "old-agent", description: "Old agent", instructions: "Old agent body" }],
     }
 
     await writeCodexBundle(codexRoot, bundle)
 
     const managedSkillsRoot = path.join(codexRoot, "skills", "compound-engineering")
+    const managedAgentsRoot = path.join(codexRoot, "agents", "compound-engineering")
     expect(await exists(path.join(managedSkillsRoot, "skill-one", "SKILL.md"))).toBe(true)
-    expect(await exists(path.join(managedSkillsRoot, "old-agent", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(managedSkillsRoot, "old-command", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(managedAgentsRoot, "old-agent.toml"))).toBe(true)
     expect(await exists(path.join(tempRoot, ".agents", "skills", "skill-one"))).toBe(false)
     expect(await exists(path.join(tempRoot, ".agents", "skills", "old-agent"))).toBe(false)
     expect(await exists(path.join(codexRoot, "compound-engineering", "install-manifest.json"))).toBe(true)
@@ -162,12 +177,15 @@ describe("writeCodexBundle", () => {
       pluginName: "compound-engineering",
       prompts: [{ name: "new-prompt", content: "Prompt content" }],
       skillDirs: [],
-      generatedSkills: [{ name: "new-agent", content: "New agent" }],
+      generatedSkills: [{ name: "new-command", content: "New command" }],
+      agents: [{ name: "new-agent", description: "New agent", instructions: "New agent body" }],
     })
 
     expect(await exists(path.join(managedSkillsRoot, "skill-one", "SKILL.md"))).toBe(false)
-    expect(await exists(path.join(managedSkillsRoot, "old-agent", "SKILL.md"))).toBe(false)
-    expect(await exists(path.join(managedSkillsRoot, "new-agent", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(managedSkillsRoot, "old-command", "SKILL.md"))).toBe(false)
+    expect(await exists(path.join(managedSkillsRoot, "new-command", "SKILL.md"))).toBe(true)
+    expect(await exists(path.join(managedAgentsRoot, "old-agent.toml"))).toBe(false)
+    expect(await exists(path.join(managedAgentsRoot, "new-agent.toml"))).toBe(true)
     expect(await exists(path.join(tempRoot, ".agents", "skills", "new-agent"))).toBe(false)
     expect(await exists(path.join(codexRoot, "prompts", "old-prompt.md"))).toBe(false)
     expect(await exists(path.join(codexRoot, "prompts", "new-prompt.md"))).toBe(true)

@@ -1,6 +1,6 @@
 # Codex Spec (Config, Prompts, Skills, Subagents, MCP)
 
-Last verified: 2026-04-18
+Last verified: 2026-04-19
 
 ## Primary sources
 
@@ -66,9 +66,11 @@ https://developers.openai.com/codex/mcp
   - `developer_instructions`
 - Optional fields can include `nickname_candidates`, `model`, `model_reasoning_effort`, `sandbox_mode`, `mcp_servers`, and `skills.config`.
 - The TOML `name` field is the source of truth; matching the filename to the agent name is only a convention.
-- Current CE output still converts Claude Markdown agents into generated Codex skills. A future Codex migration can convert them to flat custom-agent TOML files once orchestration references and cleanup semantics are updated together.
-- If CE generates Codex custom agents, those files are Codex-only artifacts and belong under `~/.codex/agents`, not `~/.agents/skills`.
-- For future generated TOML agents, use CE-prefixed agent names, preferably derived from the source category and agent name such as `ce-review-correctness-reviewer` or `ce-research-repo-research-analyst`. Current docs describe one direct TOML file per agent under `~/.codex/agents`; do not assume nested agent directories are discovered.
+- CE converts Claude Markdown agents into Codex custom-agent TOML files under `~/.codex/agents/compound-engineering/`.
+- CE keeps generated agents under `~/.codex/agents`, not `~/.agents/skills`, because `~/.agents` is shared across harnesses and can shadow native plugin installs.
+- Generated TOML agent names preserve CE's hyphenated naming and include the source category, such as `review-ce-correctness-reviewer` and `research-ce-repo-research-analyst`.
+- Empirical test on 2026-04-19 confirmed Codex discovers nested custom-agent TOML files under `~/.codex/agents/compound-engineering/` and accepts hyphenated TOML `name` values.
+- Empirical plugin test on 2026-04-19 found Codex native plugins did not register custom agents bundled under plugin-local `agents/`, plugin-local `.codex/agents/`, or an undocumented plugin manifest `agents` field. Therefore CE still needs the custom Bun Codex installer for agent-heavy workflows.
 
 ## MCP (Model Context Protocol)
 

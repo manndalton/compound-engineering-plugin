@@ -137,10 +137,27 @@ describe("CLI", () => {
     await fs.writeFile(path.join(codexRoot, "skills", "ce:plan", "SKILL.md"), "legacy raw colon skill")
     await fs.mkdir(path.join(codexRoot, "skills", "ce:review-beta"), { recursive: true })
     await fs.writeFile(path.join(codexRoot, "skills", "ce:review-beta", "SKILL.md"), "legacy raw colon beta skill")
+    await fs.mkdir(path.join(codexRoot, "skills", "ce-update"), { recursive: true })
+    await fs.writeFile(path.join(codexRoot, "skills", "ce-update", "SKILL.md"), "legacy claude-only skill")
+    await fs.mkdir(path.join(codexRoot, "skills", "ce-repo-research-analyst"), { recursive: true })
+    await fs.writeFile(
+      path.join(codexRoot, "skills", "ce-repo-research-analyst", "SKILL.md"),
+      "legacy flat generated agent skill",
+    )
     await fs.mkdir(path.join(codexRoot, "prompts"), { recursive: true })
     await fs.writeFile(path.join(codexRoot, "prompts", "report-bug.md"), "legacy prompt")
     await fs.mkdir(path.join(agentsRoot, "skills", "ce-plan"), { recursive: true })
     await fs.writeFile(path.join(agentsRoot, "skills", "ce-plan", "SKILL.md"), "legacy shared skill")
+    await fs.mkdir(path.join(codexRoot, "skills", "compound-engineering", "repo-research-analyst"), { recursive: true })
+    await fs.writeFile(
+      path.join(codexRoot, "skills", "compound-engineering", "repo-research-analyst", "SKILL.md"),
+      "legacy namespaced generated agent skill",
+    )
+    await fs.mkdir(path.join(codexRoot, "skills", "compound-engineering", "ce-plan"), { recursive: true })
+    await fs.writeFile(
+      path.join(codexRoot, "skills", "compound-engineering", "ce-plan", "SKILL.md"),
+      "current namespaced skill",
+    )
 
     const proc = Bun.spawn([
       "bun",
@@ -168,13 +185,152 @@ describe("CLI", () => {
     }
 
     expect(stdout).toContain("Cleaned codex")
-    expect(stdout).toContain("backed up 4 artifact")
+    expect(stdout).toContain("backed up 7 artifact")
     expect(await exists(path.join(codexRoot, "skills", "ce:plan"))).toBe(false)
     expect(await exists(path.join(codexRoot, "skills", "ce:review-beta"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "skills", "ce-update"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "skills", "ce-repo-research-analyst"))).toBe(false)
     expect(await exists(path.join(codexRoot, "prompts", "report-bug.md"))).toBe(false)
     expect(await exists(path.join(agentsRoot, "skills", "ce-plan"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "skills", "compound-engineering", "repo-research-analyst"))).toBe(false)
+    expect(await exists(path.join(codexRoot, "skills", "compound-engineering", "ce-plan"))).toBe(true)
     expect(await exists(path.join(codexRoot, "compound-engineering", "legacy-backup"))).toBe(true)
     expect(await exists(path.join(agentsRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("cleanup backs up legacy OpenCode artifacts on demand", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-opencode-"))
+    const opencodeRoot = path.join(tempRoot, ".opencode")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(path.join(opencodeRoot, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(opencodeRoot, "skills", "creating-agent-skills", "SKILL.md"), "legacy deleted skill")
+    await fs.mkdir(path.join(opencodeRoot, "agents"), { recursive: true })
+    await fs.writeFile(path.join(opencodeRoot, "agents", "bug-reproduction-validator.md"), "legacy deleted agent")
+    await fs.mkdir(path.join(opencodeRoot, "commands", "compound"), { recursive: true })
+    await fs.writeFile(path.join(opencodeRoot, "commands", "compound", "plan.md"), "legacy command")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "opencode",
+      "--opencode-home",
+      opencodeRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned opencode")
+    expect(await exists(path.join(opencodeRoot, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(opencodeRoot, "agents", "bug-reproduction-validator.md"))).toBe(false)
+    expect(await exists(path.join(opencodeRoot, "commands", "compound", "plan.md"))).toBe(false)
+    expect(await exists(path.join(opencodeRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("cleanup backs up legacy Pi artifacts on demand", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-pi-"))
+    const piRoot = path.join(tempRoot, ".pi", "agent")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(path.join(piRoot, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(piRoot, "skills", "creating-agent-skills", "SKILL.md"), "legacy deleted skill")
+    await fs.mkdir(path.join(piRoot, "prompts"), { recursive: true })
+    await fs.writeFile(path.join(piRoot, "prompts", "compound-plan.md"), "legacy command prompt")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "pi",
+      "--pi-home",
+      piRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned pi")
+    expect(await exists(path.join(piRoot, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(piRoot, "prompts", "compound-plan.md"))).toBe(false)
+    expect(await exists(path.join(piRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("cleanup backs up legacy Gemini artifacts on demand", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-gemini-"))
+    const geminiRoot = path.join(tempRoot, ".gemini")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(path.join(geminiRoot, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(geminiRoot, "skills", "creating-agent-skills", "SKILL.md"), "legacy deleted skill")
+    await fs.mkdir(path.join(geminiRoot, "agents"), { recursive: true })
+    await fs.writeFile(path.join(geminiRoot, "agents", "bug-reproduction-validator.md"), "legacy deleted agent")
+    await fs.mkdir(path.join(geminiRoot, "commands", "compound"), { recursive: true })
+    await fs.writeFile(path.join(geminiRoot, "commands", "compound", "plan.toml"), "legacy command")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "gemini",
+      "--gemini-home",
+      geminiRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned gemini")
+    expect(await exists(path.join(geminiRoot, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(geminiRoot, "agents", "bug-reproduction-validator.md"))).toBe(false)
+    expect(await exists(path.join(geminiRoot, "commands", "compound", "plan.toml"))).toBe(false)
+    expect(await exists(path.join(geminiRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
 
   test("cleanup backs up legacy Copilot workspace artifacts for native migration", async () => {
@@ -221,6 +377,52 @@ describe("CLI", () => {
     expect(await exists(path.join(githubRoot, "skills", "ce-plan"))).toBe(false)
     expect(await exists(path.join(githubRoot, "agents", "repo-research-analyst.agent.md"))).toBe(false)
     expect(await exists(path.join(githubRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("cleanup backs up legacy Droid artifacts for native migration", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-droid-"))
+    const droidRoot = path.join(tempRoot, ".factory")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(path.join(droidRoot, "skills", "creating-agent-skills"), { recursive: true })
+    await fs.writeFile(path.join(droidRoot, "skills", "creating-agent-skills", "SKILL.md"), "legacy deleted skill")
+    await fs.mkdir(path.join(droidRoot, "droids"), { recursive: true })
+    await fs.writeFile(path.join(droidRoot, "droids", "bug-reproduction-validator.md"), "legacy deleted droid")
+    await fs.mkdir(path.join(droidRoot, "commands"), { recursive: true })
+    await fs.writeFile(path.join(droidRoot, "commands", "plan.md"), "legacy flattened command")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "droid",
+      "--droid-home",
+      droidRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned droid")
+    expect(await exists(path.join(droidRoot, "skills", "creating-agent-skills"))).toBe(false)
+    expect(await exists(path.join(droidRoot, "droids", "bug-reproduction-validator.md"))).toBe(false)
+    expect(await exists(path.join(droidRoot, "commands", "plan.md"))).toBe(false)
+    expect(await exists(path.join(droidRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
 
   test("cleanup backs up deprecated Windsurf artifacts", async () => {
@@ -288,6 +490,8 @@ describe("CLI", () => {
     await fs.writeFile(path.join(qwenRoot, "skills", "ce-plan", "SKILL.md"), "legacy skill")
     await fs.mkdir(path.join(qwenRoot, "agents"), { recursive: true })
     await fs.writeFile(path.join(qwenRoot, "agents", "repo-research-analyst.yaml"), "legacy agent")
+    await fs.mkdir(path.join(qwenRoot, "commands"), { recursive: true })
+    await fs.writeFile(path.join(qwenRoot, "commands", "compound-plan.md"), "legacy command")
 
     const proc = Bun.spawn([
       "bun",
@@ -320,7 +524,56 @@ describe("CLI", () => {
     expect(await exists(extensionRoot)).toBe(false)
     expect(await exists(path.join(qwenRoot, "skills", "ce-plan"))).toBe(false)
     expect(await exists(path.join(qwenRoot, "agents", "repo-research-analyst.yaml"))).toBe(false)
+    expect(await exists(path.join(qwenRoot, "commands", "compound-plan.md"))).toBe(false)
     expect(await exists(path.join(qwenRoot, "compound-engineering", "legacy-backup"))).toBe(true)
+  })
+
+  test("cleanup backs up Kiro artifacts on demand", async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "cli-cleanup-kiro-"))
+    const kiroRoot = path.join(tempRoot, ".kiro")
+    const repoRoot = path.join(import.meta.dir, "..")
+
+    await fs.mkdir(path.join(kiroRoot, "skills", "ce-plan"), { recursive: true })
+    await fs.writeFile(path.join(kiroRoot, "skills", "ce-plan", "SKILL.md"), "legacy skill")
+    await fs.mkdir(path.join(kiroRoot, "skills", "compound-plan"), { recursive: true })
+    await fs.writeFile(path.join(kiroRoot, "skills", "compound-plan", "SKILL.md"), "legacy generated command skill")
+    await fs.mkdir(path.join(kiroRoot, "agents", "prompts"), { recursive: true })
+    await fs.writeFile(path.join(kiroRoot, "agents", "ce-repo-research-analyst.json"), "{}")
+    await fs.writeFile(path.join(kiroRoot, "agents", "prompts", "ce-repo-research-analyst.md"), "legacy agent prompt")
+
+    const proc = Bun.spawn([
+      "bun",
+      "run",
+      path.join(repoRoot, "src", "index.ts"),
+      "cleanup",
+      "--target",
+      "kiro",
+      "--kiro-home",
+      kiroRoot,
+    ], {
+      cwd: repoRoot,
+      stdout: "pipe",
+      stderr: "pipe",
+      env: {
+        ...process.env,
+        HOME: tempRoot,
+      },
+    })
+
+    const exitCode = await proc.exited
+    const stdout = await new Response(proc.stdout).text()
+    const stderr = await new Response(proc.stderr).text()
+
+    if (exitCode !== 0) {
+      throw new Error(`CLI failed (exit ${exitCode}).\nstdout: ${stdout}\nstderr: ${stderr}`)
+    }
+
+    expect(stdout).toContain("Cleaned kiro")
+    expect(await exists(path.join(kiroRoot, "skills", "ce-plan"))).toBe(false)
+    expect(await exists(path.join(kiroRoot, "skills", "compound-plan"))).toBe(false)
+    expect(await exists(path.join(kiroRoot, "agents", "ce-repo-research-analyst.json"))).toBe(false)
+    expect(await exists(path.join(kiroRoot, "agents", "prompts", "ce-repo-research-analyst.md"))).toBe(false)
+    expect(await exists(path.join(kiroRoot, "compound-engineering", "legacy-backup"))).toBe(true)
   })
 
   test("list returns plugins in a temp workspace", async () => {

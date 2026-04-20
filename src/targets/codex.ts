@@ -19,6 +19,7 @@ type CodexInstallManifest = {
   pluginName: string
   skills: string[]
   prompts: string[]
+  agents: string[]
 }
 
 export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle): Promise<void> {
@@ -28,6 +29,11 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
   const pluginName = bundle.pluginName ? sanitizeCodexPathComponent(bundle.pluginName) : undefined
   const manifest = pluginName ? await readInstallManifest(codexRoot, pluginName) : null
   const currentPrompts = bundle.prompts.map((prompt) => `${sanitizePathName(prompt.name)}.md`)
+  const agents = bundle.agents ?? []
+  const agentsRoot = pluginName
+    ? path.join(codexRoot, "agents", pluginName)
+    : path.join(codexRoot, "agents")
+  const currentAgents = agents.map((agent) => `${sanitizePathName(agent.name)}.toml`)
 
   if (bundle.prompts.length > 0) {
     const promptsDir = path.join(codexRoot, "prompts")
@@ -73,6 +79,17 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
     }
   }
 
+  await cleanupRemovedAgents(agentsRoot, manifest, currentAgents)
+  if (agents.length > 0) {
+    for (const agent of agents) {
+      const agentFile = `${sanitizePathName(agent.name)}.toml`
+      await writeText(path.join(agentsRoot, agentFile), renderCodexAgentToml(agent) + "\n")
+      for (const sidecar of agent.sidecarDirs ?? []) {
+        await copyDir(sidecar.sourceDir, path.join(agentsRoot, sanitizePathName(agent.name), sidecar.targetName))
+      }
+    }
+  }
+
   if (pluginName) {
     await ensureDir(skillsRoot)
     await writeInstallManifest(codexRoot, {
@@ -80,8 +97,10 @@ export async function writeCodexBundle(outputRoot: string, bundle: CodexBundle):
       pluginName,
       skills: currentSkills,
       prompts: currentPrompts,
+      agents: currentAgents,
     })
     await cleanupKnownLegacyCodexArtifacts(codexRoot, bundle)
+    await cleanupLegacyAgentSkillDirs(codexRoot, pluginName, currentSkills, bundle)
     await cleanupLegacyAgentsSkillSymlinks(codexRoot, pluginName, currentSkills, manifest)
     await cleanupPreviousManagedCodexSkillStore(codexRoot, pluginName)
   }
@@ -118,7 +137,13 @@ async function readInstallManifest(codexRoot: string, pluginName: string): Promi
       Array.isArray(parsed.skills) &&
       Array.isArray(parsed.prompts)
     ) {
-      return parsed as CodexInstallManifest
+      return {
+        version: 1,
+        pluginName,
+        skills: parsed.skills,
+        prompts: parsed.prompts,
+        agents: Array.isArray(parsed.agents) ? parsed.agents : [],
+      }
     }
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -160,6 +185,21 @@ async function cleanupRemovedPrompts(
   }
 }
 
+async function cleanupRemovedAgents(
+  agentsRoot: string,
+  manifest: CodexInstallManifest | null,
+  currentAgents: string[],
+): Promise<void> {
+  if (!manifest) return
+  const current = new Set(currentAgents)
+  for (const agentFile of manifest.agents) {
+    if (!current.has(agentFile)) {
+      await fs.rm(path.join(agentsRoot, agentFile), { force: true })
+      await fs.rm(path.join(agentsRoot, path.basename(agentFile, ".toml")), { recursive: true, force: true })
+    }
+  }
+}
+
 async function cleanupCurrentManagedSkillDir(
   targetDir: string,
   manifest: CodexInstallManifest | null,
@@ -182,6 +222,36 @@ async function cleanupKnownLegacyCodexArtifacts(codexRoot: string, bundle: Codex
   for (const promptFile of legacyArtifacts.prompts) {
     const legacyPromptPath = path.join(codexRoot, "prompts", promptFile)
     await moveLegacyArtifactToBackup(codexRoot, pluginName, "prompts", legacyPromptPath)
+  }
+}
+
+async function cleanupLegacyAgentSkillDirs(
+  codexRoot: string,
+  pluginName: string,
+  currentSkills: string[],
+  bundle: CodexBundle,
+): Promise<void> {
+  const currentSkillSet = new Set(currentSkills)
+  const legacySkillNames = new Set<string>()
+  for (const agent of bundle.agents ?? []) {
+    const finalSegment = agent.name.includes("-ce-") ? agent.name.split("-ce-").pop() : agent.name
+    legacySkillNames.add(sanitizePathName(agent.name))
+    if (finalSegment) legacySkillNames.add(`ce-${sanitizePathName(finalSegment)}`)
+  }
+  for (const name of getLegacyCodexArtifacts({
+    pluginName,
+    prompts: [],
+    skillDirs: [],
+    generatedSkills: [],
+    agents: [],
+  }).skills) {
+    legacySkillNames.add(name)
+  }
+
+  const skillsRoot = path.join(codexRoot, "skills", pluginName)
+  for (const skillName of legacySkillNames) {
+    if (currentSkillSet.has(skillName)) continue
+    await moveLegacyArtifactToBackup(codexRoot, pluginName, "skills", path.join(skillsRoot, skillName))
   }
 }
 
@@ -384,6 +454,15 @@ function escapeForRegex(value: string): string {
 
 function formatTomlString(value: string): string {
   return JSON.stringify(value)
+}
+
+function renderCodexAgentToml(agent: NonNullable<CodexBundle["agents"]>[number]): string {
+  const lines = [
+    `name = ${formatTomlString(agent.name)}`,
+    `description = ${formatTomlString(agent.description)}`,
+    `developer_instructions = ${formatTomlString(agent.instructions)}`,
+  ]
+  return lines.join("\n")
 }
 
 function formatTomlKey(value: string): string {

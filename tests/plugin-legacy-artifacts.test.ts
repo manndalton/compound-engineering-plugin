@@ -3,7 +3,8 @@ import path from "path"
 import { loadClaudePlugin } from "../src/parsers/claude"
 import { convertClaudeToCodex } from "../src/converters/claude-to-codex"
 import { convertClaudeToPi } from "../src/converters/claude-to-pi"
-import { getLegacyCodexArtifacts, getLegacyPiArtifacts, getLegacyWindsurfArtifacts } from "../src/data/plugin-legacy-artifacts"
+import { convertClaudeToKiro } from "../src/converters/claude-to-kiro"
+import { getLegacyCodexArtifacts, getLegacyKiroArtifacts, getLegacyPiArtifacts, getLegacyWindsurfArtifacts } from "../src/data/plugin-legacy-artifacts"
 
 describe("plugin legacy artifacts", () => {
   test("includes current and historical CE artifacts for Codex cleanup", async () => {
@@ -22,11 +23,23 @@ describe("plugin legacy artifacts", () => {
     expect(artifacts.skills).toContain("ce-review")
     expect(artifacts.skills).toContain("ce:review-beta")
     expect(artifacts.skills).toContain("ce-document-review")
+    expect(artifacts.skills).toContain("ce-demo-reel")
+    expect(artifacts.skills).toContain("demo-reel")
+    expect(artifacts.skills).toContain("ce:polish-beta")
+    expect(artifacts.skills).toContain("ce:release-notes")
+    expect(artifacts.skills).toContain("ce-update")
+    expect(artifacts.skills).toContain("creating-agent-skills")
     expect(artifacts.skills).toContain("repo-research-analyst")
+    expect(artifacts.skills).toContain("ce-repo-research-analyst")
+    expect(artifacts.skills).toContain("research-ce-repo-research-analyst")
     expect(artifacts.skills).toContain("bug-reproduction-validator")
     expect(artifacts.skills).toContain("report-bug")
     expect(artifacts.skills).toContain("reproduce-bug")
+    expect(artifacts.skills).toContain("resolve_pr_parallel")
 
+    expect(artifacts.prompts).toContain("codify.md")
+    expect(artifacts.prompts).toContain("compound-plan.md")
+    expect(artifacts.prompts).toContain("plan.md")
     expect(artifacts.prompts).toContain("report-bug.md")
     expect(artifacts.prompts).toContain("workflows-review.md")
     expect(artifacts.prompts).toContain("technical_review.md")
@@ -43,14 +56,41 @@ describe("plugin legacy artifacts", () => {
     const artifacts = getLegacyPiArtifacts(bundle)
 
     expect(artifacts.skills).toContain("bug-reproduction-validator")
+    expect(artifacts.skills).toContain("creating-agent-skills")
     expect(artifacts.skills).toContain("repo-research-analyst")
     expect(artifacts.skills).toContain("reproduce-bug")
+    expect(artifacts.skills).toContain("resolve_pr_parallel")
     expect(artifacts.skills).not.toContain("ce:plan")
     expect(artifacts.skills).not.toContain("ce-plan")
 
+    expect(artifacts.prompts).toContain("codify.md")
+    expect(artifacts.prompts).toContain("compound-plan.md")
+    expect(artifacts.prompts).toContain("plan.md")
     expect(artifacts.prompts).toContain("report-bug.md")
     expect(artifacts.prompts).toContain("workflows-review.md")
     expect(artifacts.prompts).toContain("technical_review.md")
+  })
+
+  test("includes historical CE artifacts for Kiro install cleanup", async () => {
+    const plugin = await loadClaudePlugin(path.join(import.meta.dir, "..", "plugins", "compound-engineering"))
+    const bundle = convertClaudeToKiro(plugin, {
+      agentMode: "subagent",
+      inferTemperature: true,
+      permissions: "none",
+    })
+
+    const artifacts = getLegacyKiroArtifacts(bundle)
+
+    expect(artifacts.skills).toContain("reproduce-bug")
+    expect(artifacts.skills).toContain("repo-research-analyst")
+    expect(artifacts.skills).toContain("creating-agent-skills")
+    expect(artifacts.skills).toContain("compound-plan")
+    expect(artifacts.skills).toContain("plan")
+    expect(artifacts.skills).toContain("resolve_pr_parallel")
+    expect(artifacts.skills).not.toContain("ce-plan")
+
+    expect(artifacts.agents).toContain("repo-research-analyst")
+    expect(artifacts.agents).not.toContain("ce-repo-research-analyst")
   })
 
   test("includes current and historical CE artifacts for deprecated Windsurf cleanup", async () => {
@@ -60,9 +100,14 @@ describe("plugin legacy artifacts", () => {
 
     expect(artifacts.skills).toContain("ce-plan")
     expect(artifacts.skills).toContain("ce-review")
+    expect(artifacts.skills).toContain("creating-agent-skills")
     expect(artifacts.skills).toContain("reproduce-bug")
+    expect(artifacts.skills).toContain("resolve_pr_parallel")
     expect(artifacts.skills).toContain("repo-research-analyst")
 
+    expect(artifacts.workflows).toContain("codify.md")
+    expect(artifacts.workflows).toContain("compound-plan.md")
+    expect(artifacts.workflows).toContain("plan.md")
     expect(artifacts.workflows).toContain("workflows-plan.md")
     expect(artifacts.workflows).toContain("ce-plan.md")
     expect(artifacts.workflows).toContain("technical_review.md")

@@ -63,9 +63,13 @@ After installing, run `/ce-setup` in any project. It checks your environment, in
 
 ### Cursor
 
+In Cursor Agent chat, install from the plugin marketplace:
+
 ```text
 /add-plugin compound-engineering
 ```
+
+Or search for "compound engineering" in the plugin marketplace.
 
 ### GitHub Copilot CLI
 
@@ -125,7 +129,7 @@ bunx @every-env/compound-plugin cleanup --target qwen
 ### OpenCode, Codex, Pi, Gemini & Kiro (experimental)
 
 This repo includes a Bun/TypeScript CLI that converts Claude Code plugins to OpenCode, Codex, Pi, Gemini CLI, and Kiro CLI.
-Use the native plugin install instructions above for Claude Code, GitHub Copilot CLI, Factory Droid, and Qwen Code.
+Use the native plugin install instructions above for Claude Code, Cursor, GitHub Copilot CLI, Factory Droid, and Qwen Code.
 
 ```bash
 # convert the compound-engineering plugin into OpenCode format
@@ -152,7 +156,11 @@ The custom install targets run CE legacy cleanup during install. To run cleanup 
 ```bash
 bunx @every-env/compound-plugin cleanup --target codex
 bunx @every-env/compound-plugin cleanup --target opencode
+bunx @every-env/compound-plugin cleanup --target pi
 bunx @every-env/compound-plugin cleanup --target gemini
+bunx @every-env/compound-plugin cleanup --target kiro
+bunx @every-env/compound-plugin cleanup --target copilot   # old Bun installs only
+bunx @every-env/compound-plugin cleanup --target droid     # old Bun installs only
 bunx @every-env/compound-plugin cleanup --target qwen      # old Bun installs only
 bunx @every-env/compound-plugin cleanup --target windsurf  # deprecated legacy installs only
 ```
@@ -165,7 +173,7 @@ Cleanup moves known CE artifacts into a `compound-engineering/legacy-backup/` di
 | Target | Output path | Notes |
 |--------|------------|-------|
 | `opencode` | `~/.config/opencode/` | Skills and agents are written to OpenCode discovery roots; `opencode.json` MCP config is deep-merged; source commands, if present, are written as `.md` files |
-| `codex` | `~/.codex/prompts` + `~/.codex/skills/<plugin>/` | CE skills install under a namespaced Codex skill root; Claude source commands, if present, become prompt + skill pairs; deprecated `workflows:*` aliases are omitted; legacy CE `.agents` symlinks are cleaned up but no new `.agents` files are written |
+| `codex` | `~/.codex/prompts` + `~/.codex/skills/<plugin>/` + `~/.codex/agents/<plugin>/` | CE skills install under a namespaced Codex skill root; Claude agents become Codex TOML custom agents; Claude source commands, if present, become prompt + skill pairs; deprecated `workflows:*` aliases are omitted; legacy CE `.agents` symlinks are cleaned up but no new `.agents` files are written |
 | `pi` | `~/.pi/agent/` | Prompts, skills, extensions, and `mcporter.json` for MCPorter interoperability |
 | `gemini` | `~/.gemini/` | Skills under `skills/` and subagents under `agents/`; source commands, if present, are written as `.toml` |
 | `kiro` | `.kiro/` | Agents as JSON configs + prompt `.md` files; only stdio MCP servers supported |

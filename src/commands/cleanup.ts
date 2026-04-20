@@ -7,6 +7,7 @@ import { convertClaudeToCodex } from "../converters/claude-to-codex"
 import { convertClaudeToCopilot } from "../converters/claude-to-copilot"
 import { convertClaudeToDroid } from "../converters/claude-to-droid"
 import { convertClaudeToGemini } from "../converters/claude-to-gemini"
+import { convertClaudeToKiro } from "../converters/claude-to-kiro"
 import { convertClaudeToOpenCode } from "../converters/claude-to-opencode"
 import { convertClaudeToPi } from "../converters/claude-to-pi"
 import {
@@ -14,6 +15,7 @@ import {
   getLegacyCopilotArtifacts,
   getLegacyDroidArtifacts,
   getLegacyGeminiArtifacts,
+  getLegacyKiroArtifacts,
   getLegacyOpenCodeArtifacts,
   getLegacyPiArtifacts,
   getLegacyPluginArtifacts,
@@ -23,7 +25,7 @@ import { moveLegacyArtifactToBackup } from "../targets/managed-artifacts"
 import { pathExists, readJson, sanitizePathName } from "../utils/files"
 import { expandHome, resolveTargetHome } from "../utils/resolve-home"
 
-const cleanupTargets = ["codex", "opencode", "pi", "gemini", "copilot", "droid", "qwen", "windsurf"] as const
+const cleanupTargets = ["codex", "opencode", "pi", "gemini", "kiro", "copilot", "droid", "qwen", "windsurf"] as const
 type CleanupTarget = typeof cleanupTargets[number]
 
 type CleanupResult = {
@@ -46,7 +48,7 @@ export default defineCommand({
     target: {
       type: "string",
       default: "all",
-      description: "Target to clean: codex | opencode | pi | gemini | copilot | droid | qwen | windsurf | all",
+      description: "Target to clean: codex | opencode | pi | gemini | kiro | copilot | droid | qwen | windsurf | all",
     },
     output: {
       type: "string",
@@ -72,6 +74,11 @@ export default defineCommand({
       type: "string",
       alias: "gemini-home",
       description: "Gemini root to clean (default: ~/.gemini)",
+    },
+    kiroHome: {
+      type: "string",
+      alias: "kiro-home",
+      description: "Kiro root to clean (default: ./.kiro)",
     },
     copilotHome: {
       type: "string",
@@ -112,6 +119,7 @@ export default defineCommand({
       piHome: resolveTargetHome(args.piHome, path.join(os.homedir(), ".pi", "agent")),
       opencodeHome: resolveTargetHome(args.opencodeHome, path.join(os.homedir(), ".config", "opencode")),
       geminiHome: resolveTargetHome(args.geminiHome, path.join(os.homedir(), ".gemini")),
+      kiroHome: resolveTargetHome(args.kiroHome, path.join(outputRoot, ".kiro")),
       copilotHome: resolveTargetHome(args.copilotHome, path.join(os.homedir(), ".copilot")),
       droidHome: resolveTargetHome(args.droidHome, path.join(os.homedir(), ".factory")),
       qwenHome: resolveTargetHome(args.qwenHome, path.join(os.homedir(), ".qwen")),
@@ -142,6 +150,7 @@ async function cleanupTarget(
     piHome: string
     opencodeHome: string
     geminiHome: string
+    kiroHome: string
     copilotHome: string
     droidHome: string
     qwenHome: string
@@ -163,6 +172,8 @@ async function cleanupTarget(
       return [await cleanupPi(plugin, roots.piHome)]
     case "gemini":
       return [await cleanupGemini(plugin, roots.geminiHome)]
+    case "kiro":
+      return [await cleanupKiro(plugin, roots.kiroHome)]
     case "copilot": {
       const rootsToClean = roots.hasExplicitOutput
         ? [resolveCopilotWorkspaceRoot(roots.workspaceRoot)]
@@ -189,10 +200,23 @@ async function cleanupCodex(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>
     permissions: "none",
   })
   const artifacts = getLegacyCodexArtifacts(bundle)
+  const currentNamespacedSkills = new Set([
+    ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
+    ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
+  ])
   const managedDir = path.join(codexRoot, plugin.manifest.name)
   let moved = 0
   for (const skillName of artifacts.skills) {
     moved += await moveIfExists(managedDir, "skills", path.join(codexRoot, "skills"), skillName, "Codex")
+    if (!currentNamespacedSkills.has(skillName)) {
+      moved += await moveIfExists(
+        managedDir,
+        "skills",
+        path.join(codexRoot, "skills", plugin.manifest.name),
+        skillName,
+        "Codex",
+      )
+    }
   }
   for (const promptFile of artifacts.prompts) {
     moved += await moveIfExists(managedDir, "prompts", path.join(codexRoot, "prompts"), promptFile, "Codex")
@@ -273,6 +297,34 @@ async function cleanupGemini(plugin: Awaited<ReturnType<typeof loadClaudePlugin>
     moved += await moveIfExists(managedDir, "commands", path.join(geminiRoot, "commands"), commandPath, "Gemini")
   }
   return { target: "gemini", root: geminiRoot, moved }
+}
+
+async function cleanupKiro(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>, kiroRoot: string): Promise<CleanupResult> {
+  const bundle = convertClaudeToKiro(plugin, {
+    agentMode: "subagent",
+    inferTemperature: true,
+    permissions: "none",
+  })
+  const artifacts = getLegacyKiroArtifacts(bundle)
+  const skillNames = new Set([
+    ...artifacts.skills,
+    ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
+    ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
+  ])
+  const agentNames = new Set([
+    ...artifacts.agents,
+    ...bundle.agents.map((agent) => sanitizePathName(agent.name)),
+  ])
+  const managedDir = path.join(kiroRoot, "compound-engineering")
+  let moved = 0
+  for (const skillName of skillNames) {
+    moved += await moveIfExists(managedDir, "skills", path.join(kiroRoot, "skills"), skillName, "Kiro")
+  }
+  for (const agentName of agentNames) {
+    moved += await moveIfExists(managedDir, "agents", path.join(kiroRoot, "agents"), `${agentName}.json`, "Kiro")
+    moved += await moveIfExists(managedDir, "agents", path.join(kiroRoot, "agents", "prompts"), `${agentName}.md`, "Kiro")
+  }
+  return { target: "kiro", root: kiroRoot, moved }
 }
 
 async function cleanupCopilot(plugin: Awaited<ReturnType<typeof loadClaudePlugin>>, copilotRoot: string): Promise<CleanupResult> {

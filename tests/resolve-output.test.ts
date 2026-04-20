@@ -21,20 +21,6 @@ describe("resolveTargetOutputRoot", () => {
     expect(result).toBe(baseOptions.piHome)
   })
 
-  test("cursor with no explicit output uses cwd", () => {
-    const result = resolveTargetOutputRoot({ ...baseOptions, targetName: "cursor" })
-    expect(result).toBe(path.join(process.cwd(), ".cursor"))
-  })
-
-  test("cursor with explicit output uses outputRoot", () => {
-    const result = resolveTargetOutputRoot({
-      ...baseOptions,
-      targetName: "cursor",
-      hasExplicitOutput: true,
-    })
-    expect(result).toBe(path.join("/tmp/output", ".cursor"))
-  })
-
   test("opencode returns outputRoot as-is", () => {
     const result = resolveTargetOutputRoot({ ...baseOptions, targetName: "opencode" })
     expect(result).toBe("/tmp/output")

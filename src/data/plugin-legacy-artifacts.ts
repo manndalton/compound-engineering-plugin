@@ -3,6 +3,7 @@ import type { CopilotBundle } from "../types/copilot"
 import type { DroidBundle } from "../types/droid"
 import type { ClaudePlugin } from "../types/claude"
 import type { GeminiBundle } from "../types/gemini"
+import type { KiroBundle } from "../types/kiro"
 import type { OpenCodeBundle } from "../types/opencode"
 import type { PiBundle } from "../types/pi"
 import { sanitizePathName } from "../utils/files"
@@ -30,6 +31,8 @@ const EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN: Record<string, LegacyPluginArtifacts> = 
       "ce:ideate",
       "ce:plan",
       "ce:plan-beta",
+      "ce:polish-beta",
+      "ce:release-notes",
       "ce:review",
       "ce:review-beta",
       "ce:work",
@@ -46,12 +49,14 @@ const EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN: Record<string, LegacyPluginArtifacts> = 
       "ce-reproduce-bug",
       "ce-review",
       "ce-review-beta",
+      "ce-update",
       "changelog",
       "claude-permissions-optimizer",
       "compound-docs",
       "compound-foundations",
       "create-agent-skill",
       "create-agent-skills",
+      "creating-agent-skills",
       "deepen-plan",
       "deepen-plan-beta",
       "demo-reel",
@@ -87,6 +92,7 @@ const EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN: Record<string, LegacyPluginArtifacts> = 
       "resolve-pr-parallel",
       "resolve-todo-parallel",
       "resolve_parallel",
+      "resolve_pr_parallel",
       "resolve_todo_parallel",
       "setup",
       "skill-creator",
@@ -176,6 +182,12 @@ const EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN: Record<string, LegacyPluginArtifacts> = 
       "ce:review",
       "ce:work",
       "changelog",
+      "codify",
+      "compound",
+      "compound:codify",
+      "compound:plan",
+      "compound:review",
+      "compound:work",
       "create-agent-skill",
       "deepen-plan",
       "deprecated:deepen-plan",
@@ -186,12 +198,14 @@ const EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN: Record<string, LegacyPluginArtifacts> = 
       "generate_command",
       "heal-skill",
       "lfg",
+      "plan",
       "plan_review",
       "playwright-test",
       "prime",
       "release-docs",
       "report-bug",
       "reproduce-bug",
+      "review",
       "resolve_parallel",
       "resolve_pr_parallel",
       "resolve_todo_parallel",
@@ -202,6 +216,7 @@ const EXTRA_LEGACY_ARTIFACTS_BY_PLUGIN: Record<string, LegacyPluginArtifacts> = 
       "test-browser",
       "test-xcode",
       "triage",
+      "work",
       "workflows:brainstorm",
       "workflows:codify",
       "workflows:compound",
@@ -236,6 +251,11 @@ export type LegacyOpenCodeArtifacts = {
   agents: string[]
 }
 
+export type LegacyKiroArtifacts = {
+  skills: string[]
+  agents: string[]
+}
+
 export type LegacyCopilotArtifacts = {
   skills: string[]
   agents: string[]
@@ -261,6 +281,14 @@ export function getLegacyCodexArtifacts(bundle: CodexBundle): LegacyTargetArtifa
   }
   for (const skill of bundle.generatedSkills) {
     skills.add(sanitizePathName(skill.name))
+  }
+  for (const agent of bundle.agents ?? []) {
+    const agentName = sanitizePathName(agent.name)
+    skills.add(agentName)
+    const finalSegment = agentName.includes("-ce-") ? agentName.split("-ce-").pop() : agentName
+    if (finalSegment) {
+      skills.add(`ce-${finalSegment}`)
+    }
   }
   for (const prompt of bundle.prompts) {
     currentPromptFiles.add(`${sanitizePathName(prompt.name)}.md`)
@@ -427,6 +455,43 @@ export function getLegacyOpenCodeArtifacts(bundle: OpenCodeBundle): LegacyOpenCo
   }
 }
 
+export function getLegacyKiroArtifacts(bundle: KiroBundle): LegacyKiroArtifacts {
+  const skills = new Set<string>()
+  const agents = new Set<string>()
+  const currentSkills = new Set<string>([
+    ...bundle.generatedSkills.map((skill) => sanitizePathName(skill.name)),
+    ...bundle.skillDirs.map((skill) => sanitizePathName(skill.name)),
+  ])
+  const currentAgents = new Set<string>(bundle.agents.map((agent) => sanitizePathName(agent.name)))
+  const extras = getLegacyPluginArtifacts(bundle.pluginName)
+
+  for (const name of extras.skills ?? []) {
+    addLegacySkillVariants(skills, name, { currentSkills })
+  }
+  for (const name of extras.agents ?? []) {
+    const skillName = normalizeLegacyName(name)
+    if (!currentSkills.has(skillName)) {
+      skills.add(skillName)
+    }
+    const agentName = normalizeLegacyName(name)
+    if (!currentAgents.has(agentName)) {
+      agents.add(agentName)
+    }
+  }
+  for (const name of extras.commands ?? []) {
+    for (const skillName of legacyCommandSkillNames(name)) {
+      if (!currentSkills.has(skillName)) {
+        skills.add(skillName)
+      }
+    }
+  }
+
+  return {
+    skills: [...skills].sort(),
+    agents: [...agents].sort(),
+  }
+}
+
 export function getLegacyCopilotArtifacts(bundle: CopilotBundle): LegacyCopilotArtifacts {
   const skills = new Set<string>()
   const agents = new Set<string>()
@@ -447,9 +512,10 @@ export function getLegacyCopilotArtifacts(bundle: CopilotBundle): LegacyCopilotA
     }
   }
   for (const name of extras.commands ?? []) {
-    const skillName = flattenLegacyCommandName(name)
-    if (!currentSkills.has(skillName)) {
-      skills.add(skillName)
+    for (const skillName of legacyCommandSkillNames(name)) {
+      if (!currentSkills.has(skillName)) {
+        skills.add(skillName)
+      }
     }
   }
 
@@ -529,6 +595,10 @@ function normalizeLegacyName(value: string): string {
 function flattenLegacyCommandName(value: string): string {
   const finalSegment = value.includes(":") ? value.split(":").pop()! : value
   return normalizeLegacyName(finalSegment)
+}
+
+function legacyCommandSkillNames(value: string): string[] {
+  return [...new Set([normalizeLegacyName(value), flattenLegacyCommandName(value)])]
 }
 
 function toNestedCommandRelativePath(value: string, ext: string): string {

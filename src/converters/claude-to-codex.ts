@@ -2,7 +2,7 @@ import fs, { type Dirent } from "fs"
 import path from "path"
 import { formatFrontmatter } from "../utils/frontmatter"
 import { type ClaudeAgent, type ClaudeCommand, type ClaudePlugin, type ClaudeSkill, filterSkillsByPlatform } from "../types/claude"
-import type { CodexBundle, CodexGeneratedSkill, CodexGeneratedSkillSidecarDir } from "../types/codex"
+import type { CodexAgent, CodexBundle, CodexGeneratedSkill, CodexGeneratedSkillSidecarDir } from "../types/codex"
 import type { ClaudeToOpenCodeOptions } from "./claude-to-opencode"
 import {
   normalizeCodexName,
@@ -57,7 +57,9 @@ export function convertClaudeToCodex(
     }
   }
 
-  const invocationTargets: CodexInvocationTargets = { promptTargets, skillTargets }
+  const agents = plugin.agents.map(convertAgent)
+  const agentTargets = buildAgentTargets(plugin, agents)
+  const invocationTargets: CodexInvocationTargets = { promptTargets, skillTargets, agentTargets }
 
   const commandSkills: CodexGeneratedSkill[] = []
   const prompts = invocableCommands.map((command) => {
@@ -68,43 +70,34 @@ export function convertClaudeToCodex(
     return { name: promptName, content }
   })
 
-  const agentSkills = plugin.agents.map((agent) =>
-    convertAgent(agent, usedSkillNames, invocationTargets),
-  )
-  const generatedSkills = [...commandSkills, ...agentSkills]
+  const generatedSkills = [...commandSkills]
 
   return {
     pluginName: plugin.manifest.name,
     prompts,
     skillDirs,
     generatedSkills,
+    agents,
     invocationTargets,
     mcpServers: plugin.mcpServers,
   }
 }
 
-function convertAgent(
-  agent: ClaudeAgent,
-  usedNames: Set<string>,
-  invocationTargets: CodexInvocationTargets,
-): CodexGeneratedSkill {
-  const name = uniqueName(normalizeCodexName(agent.name), usedNames)
+function convertAgent(agent: ClaudeAgent): CodexAgent {
+  const name = buildCodexAgentName(agent)
   const description = sanitizeDescription(
     agent.description ?? `Converted from Claude agent ${agent.name}`,
   )
-  const frontmatter: Record<string, unknown> = { name, description }
-
-  let body = transformContentForCodex(agent.body.trim(), invocationTargets)
+  let instructions = agent.body.trim()
   if (agent.capabilities && agent.capabilities.length > 0) {
     const capabilities = agent.capabilities.map((capability) => `- ${capability}`).join("\n")
-    body = `## Capabilities\n${capabilities}\n\n${body}`.trim()
+    instructions = `## Capabilities\n${capabilities}\n\n${instructions}`.trim()
   }
-  if (body.length === 0) {
-    body = `Instructions converted from the ${agent.name} agent.`
+  if (instructions.length === 0) {
+    instructions = `Instructions converted from the ${agent.name} agent.`
   }
 
-  const content = formatFrontmatter(frontmatter, body)
-  return { name, content, sidecarDirs: collectReferencedSidecarDirs(agent) }
+  return { name, description, instructions, sidecarDirs: collectReferencedSidecarDirs(agent) }
 }
 
 function convertCommandSkill(
@@ -163,6 +156,44 @@ function toCanonicalWorkflowSkillName(name: string): string | null {
 
 function shouldApplyCompoundWorkflowModel(plugin: ClaudePlugin): boolean {
   return plugin.manifest.name === "compound-engineering"
+}
+
+function buildAgentTargets(plugin: ClaudePlugin, agents: CodexAgent[]): Record<string, string> {
+  const targets: Record<string, string> = {}
+  plugin.agents.forEach((agent, index) => {
+    const targetName = agents[index]?.name
+    if (!targetName) return
+    const category = getAgentCategory(agent)
+    const aliases = [
+      agent.name,
+      normalizeCodexName(agent.name),
+      agent.name.startsWith("ce-") ? agent.name.slice("ce-".length) : "",
+      category ? `${category}:${agent.name}` : "",
+      category && agent.name.startsWith("ce-") ? `${category}:${agent.name.slice("ce-".length)}` : "",
+      category ? `${plugin.manifest.name}:${category}:${agent.name}` : "",
+      category && agent.name.startsWith("ce-") ? `${plugin.manifest.name}:${category}:${agent.name.slice("ce-".length)}` : "",
+    ].filter(Boolean)
+
+    for (const alias of aliases) {
+      targets[normalizeCodexName(alias)] = targetName
+    }
+  })
+  return targets
+}
+
+function buildCodexAgentName(agent: ClaudeAgent): string {
+  const category = getAgentCategory(agent)
+  const agentName = normalizeCodexName(agent.name)
+  return category ? `${normalizeCodexName(category)}-${agentName}` : agentName
+}
+
+function getAgentCategory(agent: ClaudeAgent): string | null {
+  const parts = agent.sourcePath.split(path.sep)
+  const agentsIndex = parts.lastIndexOf("agents")
+  if (agentsIndex === -1) return null
+  const next = parts[agentsIndex + 1]
+  if (!next || next.endsWith(".md")) return null
+  return next
 }
 
 function sanitizeDescription(value: string, maxLength = CODEX_DESCRIPTION_MAX_LENGTH): string {
