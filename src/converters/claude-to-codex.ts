@@ -16,8 +16,16 @@ const CODEX_DESCRIPTION_MAX_LENGTH = 1024
 
 export function convertClaudeToCodex(
   plugin: ClaudePlugin,
-  _options: ClaudeToCodexOptions,
+  options: ClaudeToCodexOptions,
 ): CodexBundle {
+  // Agents-only is the default for --to codex. Skills and commands are
+  // expected to install via Codex's native plugin flow (`codex plugin install`)
+  // which reads the plugin's .codex-plugin/plugin.json manifest. The Bun
+  // converter fills the one gap Codex's native spec leaves open: custom
+  // agents. Emitting skills too would double-register them — once from native
+  // install, once from this converter.
+  const includeSkills = options.codexIncludeSkills ?? false
+
   const platformSkills = filterSkillsByPlatform(plugin.skills, "codex")
   const invocableCommands = plugin.commands.filter((command) => !command.disableModelInvocation)
   const applyCompoundWorkflowModel = shouldApplyCompoundWorkflowModel(plugin)
@@ -57,10 +65,30 @@ export function convertClaudeToCodex(
     }
   }
 
+  // Agents are always converted to TOML custom agents regardless of mode —
+  // that's the whole point of --to codex. invocationTargets is populated from
+  // the full plugin so agent bodies can reference skills correctly; native
+  // install makes those skills discoverable at runtime.
   const agents = plugin.agents.map(convertAgent)
   const agentTargets = buildAgentTargets(plugin, agents)
   const invocationTargets: CodexInvocationTargets = { promptTargets, skillTargets, agentTargets }
 
+  if (!includeSkills) {
+    // Default: agents-only. Skills, prompts, command-skills, and MCP are
+    // suppressed so native plugin install is the sole source for those
+    // artifact types.
+    return {
+      pluginName: plugin.manifest.name,
+      prompts: [],
+      skillDirs: [],
+      generatedSkills: [],
+      agents,
+      invocationTargets,
+      mcpServers: undefined,
+    }
+  }
+
+  // Full / legacy / standalone mode: everything goes through the converter.
   const commandSkills: CodexGeneratedSkill[] = []
   const prompts = invocableCommands.map((command) => {
     const promptName = commandPromptNames.get(command.name)!
@@ -70,13 +98,11 @@ export function convertClaudeToCodex(
     return { name: promptName, content }
   })
 
-  const generatedSkills = [...commandSkills]
-
   return {
     pluginName: plugin.manifest.name,
     prompts,
     skillDirs,
-    generatedSkills,
+    generatedSkills: [...commandSkills],
     agents,
     invocationTargets,
     mcpServers: plugin.mcpServers,

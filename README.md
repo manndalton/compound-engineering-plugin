@@ -87,21 +87,31 @@ codex plugin marketplace add EveryInc/compound-engineering-plugin
 codex plugin install compound-engineering
 ```
 
-Native install registers compound-engineering's skills. Codex's plugin format does not register custom agents or slash commands — for the full CE experience (including the review, research, and workflow agents that delegating skills spawn via `Task`), run this followup once after the native install completes:
+Native install registers compound-engineering's skills. Codex's plugin format does not register custom agents — for the full CE experience (including the review, research, and workflow agents that delegating skills spawn via `Task`), run this followup once after the native install completes:
 
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to codex
 ```
 
-The followup writes custom-agent TOML files under `~/.codex/agents/compound-engineering/` that Codex discovers at runtime. Without it, skills that orchestrate other agents (such as `ce-code-review`, `ce-plan`, `ce-work`) will report missing delegates.
+The followup defaults to **agents only** so it complements native install without re-registering skills. Without the followup, skills that orchestrate other agents (such as `ce-code-review`, `ce-plan`, `ce-work`) will report missing delegates.
 
-If you previously used the Bun-only Codex install, back up stale CE artifacts before the native flow takes over (safe to re-run):
+If you can't or don't want to run native plugin install (offline setup, older Codex, custom workflow), the Bun converter can do a standalone install of everything:
+
+```bash
+bunx @every-env/compound-plugin install compound-engineering --to codex --include-skills
+```
+
+`--include-skills` emits skills + commands + agents together. Don't pair this with native plugin install, or skills will be registered twice.
+
+> **When this two-step goes away:** once Codex's native plugin spec supports custom agents, the Bun converter's `--to codex` path will be deprecated. `codex plugin install` will do everything in a single command.
+
+If you previously used the Bun-only Codex install, back up stale CE artifacts before switching to the native flow (safe to re-run):
 
 ```bash
 bunx @every-env/compound-plugin cleanup --target codex
 ```
 
-The `coding-tutor` plugin is also available — native install registers its skills, but its slash commands still require the Bun converter (same followup command as above, with `coding-tutor` in place of `compound-engineering`).
+The `coding-tutor` plugin is also available — native install registers its skills, but its slash commands still require the Bun converter (same followup pattern as above, with `coding-tutor` and `--include-skills`).
 
 ### GitHub Copilot CLI
 
