@@ -73,22 +73,23 @@ Or search for "compound engineering" in the plugin marketplace.
 
 ### Codex
 
-Install with two commands — first the native Codex plugin, then the agent followup:
+Three steps: register the marketplace, install the agent set, then enable the plugin inside Codex.
 
 ```bash
-# 1. Install skills via Codex's native plugin flow
+# 1. Register the marketplace with Codex
 codex plugin marketplace add EveryInc/compound-engineering-plugin
-codex plugin install compound-engineering
 
 # 2. Install the agent set (Codex's plugin spec doesn't register custom agents yet)
 bunx @every-env/compound-plugin install compound-engineering --to codex
 ```
 
-Both steps are needed. Native install registers CE's skills; the followup adds the review, research, and workflow agents that skills like `ce-code-review`, `ce-plan`, and `ce-work` spawn via `Task`. Without the followup, delegating skills will report missing agents.
+**3. Enable the plugin inside Codex.** Launch `codex`, run `/plugins`, find the **Compound Engineering** marketplace, select the **compound-engineering** plugin, and choose **Install**. Restart Codex after install completes.
 
-The followup is agents-only by default, so it complements native install without re-registering skills.
+Codex's CLI doesn't currently have a subcommand for enabling a plugin from an added marketplace — the `/plugins` TUI is the canonical flow.
 
-> **Heads up:** once Codex's native plugin spec supports custom agents, the followup step goes away — `codex plugin install` alone will do everything.
+All three steps are needed. The marketplace registration + TUI install handles skills; the Bun step adds the review, research, and workflow agents that skills like `ce-code-review`, `ce-plan`, and `ce-work` spawn via `Task`. Without the agent step, delegating skills will report missing agents. The Bun step defaults to agents-only so it doesn't double-register skills.
+
+> **Heads up:** once Codex's native plugin spec supports custom agents, the Bun agent step goes away — the TUI install alone will be sufficient.
 
 If you previously used the Bun-only Codex install, back up stale CE artifacts before switching (safe to re-run):
 
@@ -96,18 +97,18 @@ If you previously used the Bun-only Codex install, back up stale CE artifacts be
 bunx @every-env/compound-plugin cleanup --target codex
 ```
 
-The `coding-tutor` plugin installs the same way; its slash commands are an extra that needs the `--include-skills` flag on the followup.
+The `coding-tutor` plugin installs the same way; its slash commands are an extra that needs the `--include-skills` flag on the Bun step.
 
 <details>
-<summary>Standalone install without <code>codex plugin install</code></summary>
+<summary>Standalone install without <code>codex plugin marketplace add</code></summary>
 
-If for some reason you can't use Codex's native plugin install, the Bun converter can emit the full bundle on its own:
+If you can't use Codex's plugin marketplace for some reason, the Bun converter can emit the full bundle on its own:
 
 ```bash
 bunx @every-env/compound-plugin install compound-engineering --to codex --include-skills
 ```
 
-Don't combine this with `codex plugin install` — skills will register twice. The recommended path is the two-step flow above.
+Don't combine this with the marketplace + `/plugins` install — skills will register twice. The recommended path is the three-step flow above.
 
 </details>
 
