@@ -199,7 +199,7 @@ Sort findings for presentation: P0 → P1 → P2 → P3, then by finding type (e
 Apply all `safe_auto` findings to the document in a single pass:
 
 - Edit the document inline using the platform's edit tool
-- Track what was changed for the "Applied safe_auto fixes" section
+- Track what was changed for the "Applied fixes" section in the rendered output (`safe_auto` is the internal enum; the rendered section header reads "Applied fixes")
 - Do not ask for approval — these have one clear correct fix
 
 List every applied fix in the output summary so the user can see what changed. Use enough detail to convey the substance of each fix (section, what was changed, reviewer attribution). This is especially important for fixes that add content or touch document meaning — the user should not have to diff the document to understand what the review did.
@@ -212,22 +212,22 @@ After safe_auto fixes apply, remaining findings split into buckets:
 - FYI-subsection findings → surface in the presentation only, no routing
 - Zero actionable findings remaining → skip the routing question; flow directly to Phase 5 terminal question
 
-**Headless mode:** Do not use interactive question tools. Output all findings as a structured text envelope the caller can parse:
+**Headless mode:** Do not use interactive question tools. Output all findings as a structured text envelope the caller can parse. Internal enum values (`safe_auto`, `gated_auto`, `manual`, `FYI`) stay in the schema and synthesis prose; the envelope below uses user-facing vocabulary — "fixes", "Proposed fixes", "Decisions", "FYI observations" — so headless output reads the same way interactive output does.
 
 ```
 Document review complete (headless mode).
 
-Applied N safe_auto fixes:
+Applied N fixes:
 - <section>: <what was changed> (<reviewer>)
 - <section>: <what was changed> (<reviewer>)
 
-Gated-auto findings (concrete fix, requires user confirmation):
+Proposed fixes (concrete fix, requires user confirmation):
 
 [P0] Section: <section> — <title> (<reviewer>, confidence <N>)
   Why: <why_it_matters>
   Suggested fix: <suggested_fix>
 
-Manual findings (requires judgment):
+Decisions (requires user judgment):
 
 [P1] Section: <section> — <title> (<reviewer>, confidence <N>)
   Why: <why_it_matters>
@@ -253,7 +253,7 @@ Deferred questions:
 Review complete
 ```
 
-Omit any section with zero items. The envelope preserves backward compatibility — callers that only read "Applied N safe_auto fixes" and "Manual findings" continue to work; the `Gated-auto findings`, `FYI observations`, and per-finding `Dependents` sub-blocks surface alongside, not instead of, the existing buckets. When a root has dependents, render the root at its normal position in the severity-sorted list and nest its dependents as an indented `Dependents (...)` sub-block immediately below. Do not re-list dependents at their own severity position — they appear only under their root. End with "Review complete" as the terminal signal so callers can detect completion.
+Omit any section with zero items. The section headers reflect user-facing vocabulary: the "Proposed fixes" bucket carries `gated_auto` findings (the persona has a concrete fix; the user confirms), "Decisions" carries above-gate `manual` findings (judgment calls), and "FYI observations" carries `manual` findings between the 0.40 FYI floor and the per-severity gate. When a root has dependents, render the root at its normal position in the severity-sorted list and nest its dependents as an indented `Dependents (...)` sub-block immediately below. Do not re-list dependents at their own severity position — they appear only under their root. End with "Review complete" as the terminal signal so callers can detect completion.
 
 **Interactive mode:**
 
@@ -262,7 +262,7 @@ Present findings using the review output template (read `references/review-outpu
 - Errors (design tensions, contradictions, incorrect statements) first — these need resolution
 - Omissions (missing steps, absent details, forgotten entries) second — these need additions
 
-Brief summary at the top: "Applied N safe_auto fixes. K findings to consider (X errors, Y omissions). Z FYI observations."
+Brief summary at the top: "Applied N fixes. K items need attention (X errors, Y omissions). Z FYI observations."
 
 Include the Coverage table, applied fixes, FYI observations (as a distinct subsection), residual concerns, and deferred questions.
 

@@ -6,6 +6,8 @@ Use this **exact format** when presenting synthesized review findings in Interac
 
 This template describes the Phase 4 interactive presentation — what the user sees before the routing question (`references/walkthrough.md`) fires. The headless-mode envelope is documented in `references/synthesis-and-presentation.md` (Phase 4 "Route Remaining Findings" section) and is separate from this template.
 
+**Vocabulary note.** Internal enum values (`safe_auto`, `gated_auto`, `manual`, `FYI`) live in the schema and synthesis pipeline. User-facing rendered text uses plain-language labels instead: fixes (for `safe_auto`), proposed fixes (for `gated_auto`), decisions (for `manual`), and FYI observations (for `FYI`). The `Tier` column in the tables below is the one place that still names the internal enum so the user can see the synthesis decision; everything else reads as plain language.
+
 ## Example
 
 ```markdown
@@ -17,9 +19,9 @@ This template describes the Phase 4 interactive presentation — what the user s
 - security-lens -- plan adds public API endpoint with auth flow
 - scope-guardian -- plan has 15 requirements across 3 priority levels
 
-Applied 5 safe_auto fixes. 4 actionable findings to consider (2 errors, 2 omissions). 2 FYI observations.
+Applied 5 fixes. 4 items need attention (2 errors, 2 omissions). 2 FYI observations.
 
-### Applied safe_auto fixes
+### Applied fixes
 
 - Standardized "pipeline"/"workflow" terminology to "pipeline" throughout (coherence)
 - Fixed cross-reference: Section 4 referenced "Section 3.2" which is actually "Section 3.1" (coherence)
@@ -27,7 +29,7 @@ Applied 5 safe_auto fixes. 4 actionable findings to consider (2 errors, 2 omissi
 - Added "update API rate-limit config" step to Unit 4 -- implied by Unit 3's rate-limit introduction (feasibility)
 - Added auth token refresh to test scenarios -- required by Unit 2's token expiry handling (security-lens)
 
-### P0 -- Must Fix
+### P0 — Must Fix
 
 #### Errors
 
@@ -35,7 +37,7 @@ Applied 5 safe_auto fixes. 4 actionable findings to consider (2 errors, 2 omissi
 |---|---------|-------|----------|------------|------|
 | 1 | Requirements Trace | Goal states "offline support" but technical approach assumes persistent connectivity | coherence | 0.92 | manual |
 
-### P1 -- Should Fix
+### P1 — Should Fix
 
 #### Errors
 
@@ -49,7 +51,7 @@ Applied 5 safe_auto fixes. 4 actionable findings to consider (2 errors, 2 omissi
 |---|---------|-------|----------|------------|------|
 | 3 | Implementation Unit 3 | Plan proposes custom auth but does not mention existing Devise setup or migration path | feasibility | 0.85 | gated_auto |
 
-### P2 -- Consider Fixing
+### P2 — Consider Fixing
 
 #### Omissions
 
@@ -82,22 +84,32 @@ Residual concerns are issues the reviewers noticed but could not confirm with ab
 
 ### Coverage
 
-| Persona | Status | Findings | SafeAuto | GatedAuto | Manual | FYI | Residual |
-|---------|--------|----------|----------|-----------|--------|-----|----------|
+| Persona | Status | Findings | Auto | Proposed | Decisions | FYI | Residual |
+|---------|--------|----------|------|----------|-----------|-----|----------|
 | coherence | completed | 5 | 3 | 0 | 1 | 1 | 0 |
 | feasibility | completed | 3 | 1 | 1 | 0 | 0 | 1 |
 | security-lens | completed | 2 | 1 | 1 | 0 | 0 | 0 |
 | scope-guardian | completed | 2 | 0 | 0 | 1 | 1 | 0 |
 | product-lens | not activated | -- | -- | -- | -- | -- | -- |
 | design-lens | not activated | -- | -- | -- | -- | -- | -- |
+
+Chains: 1 root with 2 dependents
 ```
 
 ## Section Rules
 
-- **Summary line**: Always present after the reviewer list. Format: "Applied N safe_auto fixes. K actionable findings to consider (X errors, Y omissions). Z FYI observations." Omit any zero clause except the FYI clause when zero (it's informative that none surfaced).
-- **Applied safe_auto fixes**: List all fixes that were applied automatically (`safe_auto` tier). Include enough detail per fix to convey the substance — especially for fixes that add content or touch document meaning. Omit section if none.
+- **Summary line**: Always present after the reviewer list. Format: "Applied N fixes. K items need attention (X errors, Y omissions). Z FYI observations." Omit any zero clause except the FYI clause when zero (it's informative that none surfaced).
+- **Applied fixes**: List all fixes that were applied automatically (`safe_auto` tier). Include enough detail per fix to convey the substance — especially for fixes that add content or touch document meaning. Omit section if none.
 - **P0-P3 sections**: Only include sections that have actionable findings (`gated_auto` or `manual`). Omit empty severity levels. Within each severity, separate into **Errors** and **Omissions** sub-headers. Omit a sub-header if that severity has none of that type. The `Tier` column surfaces whether a finding is `gated_auto` (concrete fix exists, Apply recommended in walk-through) or `manual` (requires user judgment).
 - **FYI Observations**: Low-confidence `manual` findings above the 0.40 FYI floor but below the per-severity gate. Surface here for transparency; these are not actionable and do not enter the walk-through. Omit section if none.
 - **Residual Concerns**: Residual concerns noted by personas that did not make it above the confidence gate. Listed for transparency; not promoted into the review surface (cross-persona agreement boost runs on findings that already survived the gate, per synthesis step 3.4). Omit section if none.
 - **Deferred Questions**: Questions for later workflow stages. Omit if none.
-- **Coverage**: Always include. All counts are **post-synthesis**. **Findings** must equal SafeAuto + GatedAuto + Manual + FYI exactly — if deduplication merged a finding across personas, attribute it to the persona with the highest confidence and reduce the other persona's count. **Residual** = count of `residual_risks` from this persona's raw output (not the promoted subset in the Residual Concerns section).
+- **Coverage**: Always include. All counts are **post-synthesis**. **Findings** must equal Auto + Proposed + Decisions + FYI exactly — if deduplication merged a finding across personas, attribute it to the persona with the highest confidence and reduce the other persona's count. **Residual** = count of `residual_risks` from this persona's raw output (not the promoted subset in the Residual Concerns section). The `Auto` column counts `safe_auto` findings, `Proposed` counts `gated_auto`, `Decisions` counts above-gate `manual`, and `FYI` counts below-gate `manual` findings at or above the 0.40 FYI floor.
+
+## Chain-Rendering Rules
+
+Premise-dependency chains from synthesis step 3.5c annotate roots and dependents. Rendering follows the same count invariant documented in the synthesis reference; this template restates the rules so interactive output cannot drift from the headless envelope.
+
+- **Dependents render only under their root.** When a finding has `dependents`, render the root at its normal severity position (in its P-tier Errors or Omissions table). Immediately below the root's table row, emit an indented `Dependents (N)` sub-block listing each dependent's `# | Section | Issue | Reviewer | Confidence | Tier` entry. Dependents MUST NOT appear at their own severity position. Findings without `depends_on` and without `dependents` render as they do today.
+- **Count invariant.** The `Findings` column in Coverage continues to equal Auto + Proposed + Decisions + FYI. Each finding counts exactly once: a dependent counts in its assigned bucket (`Auto` / `Proposed` / `Decisions` / `FYI`) but does NOT render at its own severity position. The source of truth is the post-Step-4 `dependents` array on each root — the same array the headless envelope reads — so coverage count and rendering cannot drift.
+- **Chains line (optional).** When one or more chains exist, add a final line to the coverage block: `Chains: N root(s) with M dependents` where N is the number of roots and M is the total dependent count summed across all roots. Omit the line when no chains exist. This mirrors the `Chains:` line the headless envelope emits in `references/synthesis-and-presentation.md` so reviewers get the same chain visibility in both modes.

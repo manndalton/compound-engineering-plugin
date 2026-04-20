@@ -262,7 +262,7 @@ When the routing question was skipped because no `gated_auto` / above-gate `manu
 No FYI or residual concerns:
 
 ```
-All findings resolved — 3 safe_auto fixes applied.
+All findings resolved — 3 fixes applied.
 
 Verdict: Ready.
 ```
@@ -270,7 +270,7 @@ Verdict: Ready.
 FYI or residual concerns remain:
 
 ```
-All actionable findings resolved — 3 safe_auto fixes applied. (2 FYI observations, 1 residual concern remain in the report.)
+All actionable findings resolved — 3 fixes applied. (2 FYI observations, 1 residual concern remain in the report.)
 
 Verdict: Ready.
 ```

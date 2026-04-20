@@ -432,10 +432,12 @@ describe("ce-doc-review contract", () => {
       "plugins/compound-engineering/skills/ce-doc-review/references/synthesis-and-presentation.md"
     )
 
-    // Bucket headers for the new tiers appear in the headless envelope template
-    expect(synthesis).toContain("Applied N safe_auto fixes")
-    expect(synthesis).toContain("Gated-auto findings")
-    expect(synthesis).toContain("Manual findings")
+    // Bucket headers for the new tiers appear in the headless envelope template.
+    // User-facing vocabulary: fixes / Proposed fixes / Decisions / FYI observations
+    // maps to the safe_auto / gated_auto / manual / FYI internal enum values.
+    expect(synthesis).toContain("Applied N fixes")
+    expect(synthesis).toContain("Proposed fixes")
+    expect(synthesis).toContain("Decisions")
     expect(synthesis).toContain("FYI observations")
 
     // Terminal signal preserved for programmatic callers
