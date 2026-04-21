@@ -41,9 +41,9 @@ cd .worktrees/<branch>                     # switch to a worktree
 cd "$(git rev-parse --show-toplevel)"      # return to main checkout
 ```
 
-To copy `.env*` files into an existing worktree created without them, copy them manually:
+To copy `.env*` files into an existing worktree created without them, run this from the main repo (not from inside the worktree, since branch names often contain slashes like `feat/login`):
 ```bash
-cp ../../.env* ./   # from within the worktree
+cp .env* .worktrees/<branch>/
 ```
 
 ## Dev tool trust behavior

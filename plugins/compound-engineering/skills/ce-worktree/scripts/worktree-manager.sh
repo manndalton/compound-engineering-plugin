@@ -20,8 +20,9 @@ set -euo pipefail
 # handles normal repos, linked worktrees (where --show-toplevel would return
 # the nested worktree), submodules (where --git-common-dir points under
 # .git/modules), and --separate-git-dir setups (where --git-common-dir points
-# to an external path).
-GIT_ROOT=$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')
+# to an external path). Parse with `sed` to preserve paths containing spaces
+# (awk '{print $2}' would truncate them).
+GIT_ROOT=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -n 1)
 WORKTREE_DIR="$GIT_ROOT/.worktrees"
 
 usage() {
