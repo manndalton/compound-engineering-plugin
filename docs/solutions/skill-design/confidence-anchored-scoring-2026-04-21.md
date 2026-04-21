@@ -92,7 +92,36 @@ Filter at `>= 50` for doc review; let the routing menu handle volume. Dismissing
 
 Landed in a single atomic change because the schema, template, synthesis, rendering, personas, and tests are coupled — a partial migration would have failed validation at every boundary. The schema change is the load-bearing commit; the persona updates and test updates consume it.
 
-The deferred follow-ups are:
+## Evaluation
+
+After the migration, an A/B evaluation compared baseline (continuous float) against treatment (anchored integer rubric) across four documents spanning size and type: a 7KB in-repo plan, a 63KB in-repo plan, a 27KB external-repo plan, and a 10KB in-repo brainstorm. Both versions were executed by orchestrator subagents reading their matching skill snapshot as prompt material, dispatching all 7 personas, and emitting the Phase 4 headless envelope. The workspace, per-run envelopes, and timing data live under `.context/compound-engineering/ce-doc-review-eval/` during the evaluation.
+
+### Confirmed effects
+
+- **Score dispersion collapsed.** Baseline produced 7-12 distinct float values per document (typical: 0.45, 0.50, 0.55, 0.65, 0.72, 0.80, 0.85) — the exact false-precision clustering the migration targeted. Treatment concentrated on 2-3 anchors per document. Anchors `0` and `25` were never emitted by any persona, which matches the template's "suppress silently" instruction for those tiers.
+- **Cross-persona +1 anchor promotion fires as specified.** Observed on cli-printing-press plan (security-lens + feasibility promoting an IP-range-check finding to anchor 100) and interactive-judgment plan (product-lens + adversarial promoting a premise finding to anchor 100).
+- **Chain linking, safe_auto silent-apply, FYI routing, and per-persona redundancy collapse** all exercised correctly on at least one run.
+- **The `>= 50` threshold is load-bearing on large plans.** On cli-printing-press, baseline's graduated per-severity gates admitted 13 Decisions; treatment admitted 21. Inspection of the delta confirmed the new findings were genuine concerns the old gates' coin-flip behavior at boundaries was suppressing — not noise. The migration doc's prediction that "missing a real concern is expensive" held in practice.
+
+### Anchor-75 calibration boundary discovered
+
+The evaluation surfaced a boundary issue: on large plans, personas emitted anchor 75 for premise-strength concerns ("motivation is thin," "premise is unconvincing") whose "will be hit in practice" claim was the reviewer's reading, not a concrete downstream outcome. This inflated the actionable tier with strength-of-argument critique that was more appropriately observational.
+
+The subagent template's anchor 75 bullet was refined with a calibration paragraph:
+
+> **Anchor `75` requires naming a concrete downstream consequence someone will hit** — a wrong deploy order, an unimplementable step, a contract mismatch, missing evidence that blocks a decision. Strength-of-argument concerns ("motivation is thin," "premise is unconvincing," "a different reader might disagree") do not meet this bar on their own — they are advisory observations and land at anchor `50` unless they also name the specific downstream outcome the reader hits.
+
+The test the template adds: *"will a competent implementer or reader concretely encounter this, or is this my opinion about the document's strength?"* The former is `75`; the latter is `50`.
+
+Re-evaluation with the tightened criterion shifted cli-printing-press from 21 Decisions/4 FYI to 10 Decisions/23 FYI — premise-strength concerns moved to observational routing. The change was *not* a blanket suppression of premise findings: on interactive-judgment plan, the premise challenge survived the tightening and got cross-persona-promoted to anchor 100, because its concrete consequence was explicit ("8-unit redesign creates maintenance debt across three reference files if the premise is wrong"). The refinement distinguishes grounded premise challenges from hand-wavy framing critique — which is the exact precision the rubric was meant to have from the start.
+
+### Limitations
+
+- **Small corpus.** Four documents is enough to confirm macro patterns (clustering, severity inflation, feature coverage) but not to tune threshold values or anchor boundaries at finer granularity.
+- **Harness drift between iterations.** Iteration-1 orchestrators dispatched parallel persona subagents; iteration-2 orchestrators executed personas inline (nested Agent tool unavailable in that session). This affected side metrics (proposed-fix count on cli-printing-press iteration-2 dropped 15 → 4, likely harness-driven rather than tweak-driven) but did not obscure the tweak's core effect, which was large-magnitude.
+- **No absolute-calibration ground truth.** The evaluation measured the migration's stated failure modes disappearing. Whether an anchor-75 finding literally hits 75% of the time remains unmeasured; no labeled doc-review corpus exists.
+
+## Deferred follow-ups
 
 - Port the pattern to `ce-code-review` with a code-review-appropriate threshold
 - Evaluate a neutral-scorer second pass (a cheap agent that re-scores findings independent of the producing persona) once the anchor rubric has been observed in practice
