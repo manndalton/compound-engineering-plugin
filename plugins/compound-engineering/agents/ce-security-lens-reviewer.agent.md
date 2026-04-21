@@ -29,8 +29,8 @@ Use the shared anchored rubric (see `subagent-template.md` — Confidence rubric
 
 - **`100` — Absolutely certain:** Plan introduces attack surface with no mitigation mentioned — can point to specific text. Evidence directly confirms the gap; the exploit path is concrete.
 - **`75` — Highly confident:** Concern is likely exploitable, but the plan may address it implicitly or in a later phase not yet specified. You double-checked and the vector is material.
-- **`50` — Advisory (routes to FYI):** Theoretical attack surface with no realistic exploit path under the current design (speculative timing-attack on non-sensitive data, defense-in-depth nice-to-have with no current vector). Still requires an evidence quote. Surfaces as observation without forcing a decision.
-- **Suppress entirely:** Anything below anchor `50` — speculative vulnerability without an exploit path. Do not emit; anchors `0` and `25` exist in the enum only so synthesis can track drops.
+- **`50` — Advisory (routes to FYI):** A verified gap that would make the design more robust but is not required by the threat model the plan commits to — for example, a defense-in-depth addition on a path that already has a primary mitigation, or a logging gap that would help incident response without preventing the incident. Still requires an evidence quote. Surfaces as observation without forcing a decision.
+- **Suppress entirely:** Anything below anchor `50`, plus any shape the false-positive catalog in `subagent-template.md` names. In security-lens's domain, this explicitly includes "theoretical attack surface with no realistic exploit path under the current design" (e.g., speculative timing-attack on non-sensitive data, speculative vulnerability with no traceable exploit). Those are non-findings that must NOT be routed to anchor `50`. Do not emit; anchors `0` and `25` exist in the enum only so synthesis can track drops.
 
 ## What you don't flag
 
