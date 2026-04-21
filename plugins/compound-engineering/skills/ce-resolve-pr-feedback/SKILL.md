@@ -49,7 +49,7 @@ Returns a JSON object with three keys:
 
 | Key | Contents | Has file/line? | Resolvable? |
 |-----|----------|---------------|-------------|
-| `review_threads` | Unresolved, non-outdated inline code review threads | Yes | Yes (GraphQL) |
+| `review_threads` | Unresolved inline code review threads (includes outdated; each carries its `isOutdated` flag so the resolver can account for line drift) | Yes | Yes (GraphQL) |
 | `pr_comments` | Top-level PR conversation comments (excludes PR author) | No | No |
 | `review_bodies` | Review submission bodies with non-empty text (excludes PR author) | No | No |
 
@@ -151,6 +151,7 @@ Each agent receives:
 - The full comment text (all comments in the thread)
 - The PR number (for context)
 - The feedback type (`review_thread`)
+- The `isOutdated` flag from the thread node (tells the agent the reported line may have drifted)
 
 **For PR comments and review bodies** (`pr_comments`, `review_bodies`): These lack file/line context. Spawn a `workflow:ce-pr-comment-resolver` agent for each actionable non-clustered item. The agent receives the comment ID, body text, PR number, and feedback type (`pr_comment` or `review_body`). The agent must identify the relevant files from the comment text and the PR diff.
 

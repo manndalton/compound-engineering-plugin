@@ -89,9 +89,13 @@ query FetchPRFeedback($owner: String!, $repo: String!, $pr: Int!) {
 }' | jq '.data.repository.pullRequest as $pr |
   # Bots whose top-level comments and review bodies are wrappers or CI summaries, not actionable.
   ["coderabbitai", "chatgpt-codex-connector", "gemini-code-assist", "copilot-pull-request-reviewer", "codecov"] as $review_bot_logins |
-  # Unresolved threads (existing behavior, unchanged)
+  # Unresolved threads. `isOutdated` means the diff hunk around the comment
+  # has shifted since the thread was opened -- not that the reviewer concern
+  # was addressed. Resolution state is the only authoritative signal; outdated
+  # threads are still surfaced (with their isOutdated flag intact) so the
+  # resolver can factor in that the referenced line may have moved.
   [$pr.reviewThreads.edges[]
-    | select(.node.isResolved == false and .node.isOutdated == false)] as $unresolved |
+    | select(.node.isResolved == false)] as $unresolved |
   # Resolved threads for cross-invocation awareness (last 10 by most recent comment)
   [$pr.reviewThreads.edges[]
     | select(.node.isResolved == true)
