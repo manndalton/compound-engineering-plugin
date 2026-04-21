@@ -236,7 +236,7 @@ For every `residual_risk` and `deferred_question` across all persona outputs, ch
 
 Do NOT drop residual/deferred items that introduce genuinely new signal (a concern or question the actionable findings do not touch). When in doubt, keep — this pass is for obvious restatements, not borderline calls.
 
-Run this pass on the merged set across all personas. Record the count dropped in Coverage as a "N restated items suppressed" footnote so the user can see the pipeline did the work.
+Run this pass on the merged set across all personas. Record the count dropped as a Coverage footnote line when non-zero: `Restated: N (residual/deferred items suppressed as duplicates of actionable findings)`. Ordering: footnotes appear in the sequence `Dropped:`, `Chains:`, `Restated:` below the Coverage table, each on its own line. Omit any footnote whose count is zero.
 
 ## Phase 4: Apply and Present
 
@@ -301,6 +301,7 @@ Deferred questions:
 
 Dropped: N (anchors 0/25 suppressed)
 Chains: N root(s) with M dependents
+Restated: N (residual/deferred items suppressed as duplicates of actionable findings)
 
 Review complete
 ```
