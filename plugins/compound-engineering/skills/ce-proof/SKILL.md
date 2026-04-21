@@ -28,7 +28,7 @@ Set the display name once per doc session by posting to presence with the `X-Age
 
 Human-in-the-loop iteration over an existing local markdown file: upload to Proof, let the user annotate in Proof's web UI, ingest feedback as in-thread replies and tracked edits, and sync the final doc back to disk. Two entry points, identical mechanics — load `references/hitl-review.md` for the full loop spec (invocation contract, mark classification, idempotent ingest passes, exception-based terminal reporting, end-sync atomic write) in either case:
 
-- **Direct user request** — a bare user phrase naming a local markdown file and asking to iterate collaboratively via Proof: "share this to proof so we can iterate", "iterate with proof on this doc", "HITL this file with me", "proof this doc", "let's get feedback on this in proof". The file is whichever markdown the user just created, edited, or referenced; if ambiguous, ask which file. This is a first-class entry point — do not require an upstream caller.
+- **Direct user request** — a bare user phrase naming a local markdown file and asking to iterate collaboratively via Proof: "share this to proof so we can iterate", "iterate with proof on this doc", "HITL this file with me", "let's get feedback on this in proof", "open this in proof editor so I can review". The file is whichever markdown the user just created, edited, or referenced; if ambiguous, ask which file. This is a first-class entry point — do not require an upstream caller.
 - **Upstream skill handoff** — `ce-brainstorm`, `ce-ideate`, or `ce-plan` finishes a draft and hands it off for human review before the next phase, passing the file path and title explicitly.
 
 ## Web API (Primary for Sharing)
