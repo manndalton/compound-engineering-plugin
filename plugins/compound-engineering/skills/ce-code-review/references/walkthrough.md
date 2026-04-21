@@ -22,7 +22,7 @@ Each finding's recommended action has already been normalized by Stage 5 (step 7
 
 Each finding is presented in two parts: a **terminal output block** carrying the explanation, and a **question** via the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini) carrying the decision. Never merge the two — the terminal block uses markdown; the question uses plain text.
 
-In Claude Code the tool should already be loaded from the Interactive-mode pre-load step in `SKILL.md` — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. Rendering the per-finding question as narrative text is a bug, not a valid fallback.
+In Claude Code the tool should already be loaded from the Interactive-mode pre-load step in `SKILL.md` — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. If the tool is genuinely unavailable or errors (e.g., Codex runtime modes without `request_user_input`), present the per-finding options as a numbered list and wait for the user's reply — never silently skip the question.
 
 ### Terminal output block (print before firing the question)
 

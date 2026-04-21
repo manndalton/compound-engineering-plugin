@@ -133,6 +133,6 @@ When uncertain, prefer "drop with explicit user-facing notice" over "pass throug
 
 ## Cross-platform notes
 
-The question-tool name varies by platform. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). In Claude Code the tool should already be loaded from the Interactive-mode pre-load step — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. Only when that load explicitly fails, or on a platform with no blocking tool, fall back to numbered options and waiting for the user's next reply before proceeding.
+The question-tool name varies by platform. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). In Claude Code the tool should already be loaded from the Interactive-mode pre-load step — if it isn't, call `ToolSearch` with query `select:AskUserQuestion` now. If the tool is unavailable or errors (load failure, platform with no blocking tool, or a Codex runtime mode without `request_user_input`), fall back to numbered options and wait for the user's reply — never silently skip the question.
 
 The fallback chain's final tier (harness task-tracking primitive) does not exist on every target platform. When converted for a platform that has no equivalent of `TaskCreate` / `update_plan`, the agent should treat that platform as "no harness sink" and move directly to the no-sink behavior (omit Defer from menus and tell the user why).

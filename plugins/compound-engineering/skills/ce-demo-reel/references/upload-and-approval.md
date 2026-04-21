@@ -18,7 +18,7 @@ For multiple files (static screenshots tier), upload each file separately.
 
 ## Step 2: Approval Gate
 
-Present the preview URL to the user for approval. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini).
+Present the preview URL to the user for approval. Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If the tool is unavailable or errors, present the options in chat and wait for the user's reply — never silently skip the question.
 
 **Question:** "Evidence preview (1h link): [PREVIEW_URL]"
 

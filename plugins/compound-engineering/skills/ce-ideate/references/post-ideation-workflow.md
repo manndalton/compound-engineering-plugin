@@ -136,7 +136,7 @@ When the proof skill returns control:
 
 ## Phase 6: Refine or Hand Off
 
-Ask what should happen next using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If no question tool is available, present numbered options in chat and wait for the user's reply.
+Ask what should happen next using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If the tool is unavailable or errors, present numbered options in chat and wait for the user's reply — never silently skip the question.
 
 **Question:** "What should the agent do next?"
 

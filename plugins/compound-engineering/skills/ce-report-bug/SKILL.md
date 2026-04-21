@@ -11,7 +11,7 @@ Report bugs encountered while using the compound-engineering plugin. This skill 
 
 ## Step 1: Gather Bug Information
 
-Ask the user the following questions (using the platform's blocking question tool — e.g., `AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini — or present numbered options and wait for a reply):
+Ask the user the following questions using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If the tool is unavailable or errors, present numbered options in chat and wait for a reply — never silently skip the question:
 
 **Question 1: Bug Category**
 - What type of issue are you experiencing?

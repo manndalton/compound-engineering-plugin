@@ -124,7 +124,7 @@ Keep rationale at the highest-level location that covers it; restate behavioral 
 ### Cross-Platform User Interaction
 
 - [ ] When a skill needs to ask the user a question, instruct use of the platform's blocking question tool and name the known equivalents (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini)
-- [ ] Include a fallback for environments without a question tool (e.g., present numbered options and wait for the user's reply before proceeding)
+- [ ] Include a fallback: if the tool is unavailable or errors, present numbered options in chat and wait for the user's reply — never silently skip the question. (Codex's `request_user_input` is only available in Plan mode, so the fallback path is the default in Codex's edit modes.)
 
 ### Interactive Question Tool Design
 

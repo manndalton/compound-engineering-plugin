@@ -113,7 +113,7 @@ Once the root cause is confirmed, present:
 - Which tests to add or modify to prevent recurrence (specific test file, test case description, what the assertion should verify)
 - Whether existing tests should have caught this and why they did not
 
-Then offer next steps (use the platform's question tool — `AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini — or present numbered options and wait):
+Then offer next steps using the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If the tool is unavailable or errors, present numbered options in chat and wait for the user's reply — never silently skip the question:
 
 1. **Fix it now** — proceed to Phase 3
 2. **View in Proof** (`/ce-proof`) — for easy review and sharing with others
