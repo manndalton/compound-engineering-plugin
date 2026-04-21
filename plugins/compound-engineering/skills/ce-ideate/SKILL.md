@@ -18,7 +18,7 @@ This workflow produces a ranked ideation artifact in `docs/ideation/`. It does *
 
 ## Interaction Method
 
-Use the platform's blocking question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex, `ask_user` in Gemini). If the tool is unavailable or errors, present numbered options in chat and wait for the user's reply — never silently skip the question.
+Use the platform's blocking question tool: `AskUserQuestion` in Claude Code (call `ToolSearch` with `select:AskUserQuestion` first if its schema isn't loaded), `request_user_input` in Codex, `ask_user` in Gemini. Fall back to numbered options in chat only when no blocking tool exists in the harness or the call errors (e.g., Codex edit modes) — not because a schema load is required. Never silently skip the question.
 
 Ask one question at a time. Prefer concise single-select choices when natural options exist.
 
