@@ -328,6 +328,8 @@ Avoid:
 - Units that span multiple unrelated concerns
 - Units that are so vague an implementer still has to invent the plan
 
+Each unit carries a stable plan-local **U-ID** assigned in Phase 3.5 (`U1`, `U2`, …). U-IDs survive reordering, splitting, and deletion: new units take the next unused number, gaps are fine, and existing IDs are never renumbered. This lets `ce-work` reference units unambiguously across plan edits.
+
 #### 3.4 High-Level Technical Design (Optional)
 
 Before detailing implementation units, decide whether an overview would help a reviewer validate the intended approach. This section communicates the *shape* of the solution — how pieces fit together — without dictating implementation.
@@ -371,10 +373,14 @@ The tree is a scope declaration showing the expected output shape. It is not a c
 
 #### 3.5 Define Each Implementation Unit
 
+Each unit's heading carries a stable U-ID prefix matching the format used for R/A/F/AE in requirements docs: `- [ ] U1. **[Name]**`. The prefix is plain text, not bolded — the bold is reserved for the unit name. Number sequentially within the plan starting at U1.
+
+**Stability rule.** Once assigned, a U-ID is never renumbered. Reordering units leaves their IDs in place (e.g., U1, U3, U5 in their new order is correct; renumbering to U1, U2, U3 is not). Splitting a unit keeps the original U-ID on the original concept and assigns the next unused number to the new unit. Deletion leaves a gap; gaps are fine. This rule matters most during deepening (Phase 5.3), which is the most likely accidental-renumber vector.
+
 For each unit, include:
 - **Goal** - what this unit accomplishes
-- **Requirements** - which requirements or success criteria it advances
-- **Dependencies** - what must exist first
+- **Requirements** - which requirements or success criteria it advances (cite R-IDs, and A/F/AE IDs when origin supplies them)
+- **Dependencies** - what must exist first (cite by U-ID, e.g., "U1, U3")
 - **Files** - repo-relative file paths to create, modify, or test (never absolute paths)
 - **Approach** - key decisions, data flow, component boundaries, or integration notes
 - **Execution note** - optional, only when the unit benefits from a non-default execution posture such as test-first or characterization-first
@@ -531,13 +537,19 @@ deepened: YYYY-MM-DD  # optional, set when the confidence check substantively st
 
 ## Implementation Units
 
-- [ ] **Unit 1: [Name]**
+<!-- Each unit carries a stable plan-local U-ID (U1, U2, …) assigned sequentially.
+     U-IDs are never renumbered: reordering preserves them in place, splitting keeps the
+     original U-ID and assigns the next unused number to the new unit, deletion leaves
+     a gap. This anchor is what ce-work references in blockers and verification, so
+     stability across plan edits is load-bearing. -->
+
+- [ ] U1. **[Name]**
 
 **Goal:** [What this unit accomplishes]
 
 **Requirements:** [R1, R2]
 
-**Dependencies:** [None / Unit 1 / external prerequisite]
+**Dependencies:** [None / U1 / external prerequisite]
 
 **Files:**
 - Create: `path/to/new_file`
