@@ -114,11 +114,13 @@ describe("ce-code-review contract", () => {
     expect(trackerDefer).toContain("Named tracker")
     expect(trackerDefer).toContain("GitHub Issues via `gh`")
     expect(trackerDefer).not.toContain(".context/compound-engineering/todos/")
+    expect(content).not.toMatch(/harness task primitive|task-tracking primitive/)
 
     // Harness task-tracking primitive is no longer a fallback tier — it was removed
     // because in-session tasks do not meet the durable-filing intent of a Defer action.
     expect(trackerDefer).not.toMatch(/Harness task primitive \(last resort\)/)
     expect(trackerDefer).not.toMatch(/Once-per-session harness-fallback confirmation/)
+    expect(trackerDefer).not.toMatch(/no-sink/)
 
     // Non-interactive execution mode exists for autonomous callers (e.g., lfg).
     expect(trackerDefer).toContain("## Execution Modes")
@@ -315,6 +317,9 @@ describe("ce-code-review contract", () => {
       await expect(readRepoFile(path.replace("shipping-workflow.md", "tracker-defer.md"))).resolves.toContain(
         "Non-interactive mode",
       )
+      await expect(readRepoFile(path.replace("shipping-workflow.md", "tracker-defer.md"))).resolves.not.toMatch(
+        /no-sink/,
+      )
 
       // Gate step is explicitly labeled and required after Tier 2.
       expect(workflow).toContain("**Residual Work Gate**")
@@ -335,6 +340,9 @@ describe("ce-code-review contract", () => {
     const lfg = await readRepoFile("plugins/compound-engineering/skills/lfg/SKILL.md")
     await expect(readRepoFile("plugins/compound-engineering/skills/lfg/references/tracker-defer.md")).resolves.toContain(
       "Non-interactive mode",
+    )
+    await expect(readRepoFile("plugins/compound-engineering/skills/lfg/references/tracker-defer.md")).resolves.not.toMatch(
+      /no-sink/,
     )
 
     // Autonomous residual handoff step exists between code review and test-browser.
