@@ -305,7 +305,7 @@ describe("ce-code-review contract", () => {
 
   test("orchestration callers pass explicit mode flags", async () => {
     const lfg = await readRepoFile("plugins/compound-engineering/skills/lfg/SKILL.md")
-    expect(lfg).toContain("/ce-code-review mode:autofix")
+    expect(lfg).toMatch(/ce-code-review[^\n]*mode:autofix/)
   })
 
   test("ce-work shipping-workflow enforces a residual-work gate after Tier 2 review", async () => {
