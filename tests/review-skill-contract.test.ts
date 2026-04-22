@@ -259,8 +259,13 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/confidence:\s*integer in \{0, 25, 50, 75, 100\}/)
 
     // Confidence gate at anchor 75 with P0 exception at 50
-    expect(content).toMatch(/Suppress findings below anchor 75/)
+    expect(content).toMatch(/suppress remaining findings below anchor 75/i)
     expect(content).toMatch(/P0 findings at anchor 50\+ survive/)
+
+    // Confidence gate runs AFTER dedup, promotion, and demotion so anchor-50 findings
+    // can be promoted by cross-reviewer agreement or rerouted to soft buckets first.
+    // This is a load-bearing ordering — if the gate runs early, promotion/demotion become unreachable.
+    expect(content).toMatch(/gate runs late deliberately/i)
 
     // One-anchor promotion replaces +0.10 boost
     expect(content).toMatch(/one anchor step.*50 -> 75.*75 -> 100/)
@@ -335,8 +340,8 @@ describe("ce-code-review contract", () => {
   test("mode-aware demotion routes weak general-quality findings to soft buckets", async () => {
     const content = await readRepoFile("plugins/compound-engineering/skills/ce-code-review/SKILL.md")
 
-    // Stage 5 step 7c exists
-    expect(content).toMatch(/7c\..*Mode-aware demotion/i)
+    // Mode-aware demotion step exists (sub-step within Stage 5; numbering may shift if steps reorder)
+    expect(content).toMatch(/Mode-aware demotion of weak general-quality findings/i)
 
     // Conservative scope: testing + maintainability personas only
     expect(content).toContain("`testing` or `maintainability`")
@@ -348,8 +353,12 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/`autofix_class` is `advisory`/)
 
     // Interactive/report-only: route to testing_gaps or residual_risks
-    expect(content).toMatch(/`testing`.*`testing_gaps`/)
-    expect(content).toMatch(/`maintainability`.*`residual_risks`/)
+    expect(content).toMatch(/`testing`,?\s*append.*`testing_gaps`/)
+    expect(content).toMatch(/`maintainability`,?\s*append.*`residual_risks`/)
+
+    // Demotion entry uses title-only (compact return omits why_it_matters; report-only has no artifact)
+    expect(content).toMatch(/append `<file:line> -- <title>` to/)
+    expect(content).toMatch(/title only.*compact return omits/i)
 
     // Headless/autofix: suppress entirely
     expect(content).toMatch(/Headless and autofix modes.*Suppress/)
