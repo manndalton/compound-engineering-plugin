@@ -333,6 +333,9 @@ describe("ce-code-review contract", () => {
 
       // Accept-and-proceed path threads findings into the PR description.
       expect(workflow).toContain("Known Residuals")
+      expect(workflow).toContain("docs/residual-review-findings/<branch-or-head-sha>.md")
+      expect(workflow).toContain("If the user later chooses the no-PR `ce-commit` path")
+      expect(workflow).toContain("must not live only in the transient session")
     }
   })
 
@@ -365,6 +368,10 @@ describe("ce-code-review contract", () => {
     expect(lfg).toContain("gh pr edit PR_NUMBER --body-file BODY_FILE")
     expect(lfg).toContain("## Residual Review Findings")
     expect(lfg).toContain("docs/residual-review-findings/<branch-or-head-sha>.md")
+    expect(lfg).toContain("prefer `origin` when present")
+    expect(lfg).toContain("choose the first configured remote")
+    expect(lfg).toContain("git push --set-upstream <remote> HEAD")
+    expect(lfg).not.toContain("git push --set-upstream origin HEAD")
     expect(lfg).toContain("Do not output DONE until either the existing PR body has been updated or this fallback file commit has been pushed.")
 
     // Autopilot contract: never prompt, but require a durable sink before DONE.

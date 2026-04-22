@@ -39,10 +39,10 @@ This file contains the shipping workflow (Phase 3-4). Load it only when all Phas
    Options (four or fewer, self-contained labels):
    - `Apply/fix now` — loop back into review with focused fixes; the agent investigates each finding, applies changes where safe, and re-runs review.
    - `File tickets via project tracker` — load `references/tracker-defer.md` in Interactive mode; the agent files tickets in the project's detected tracker (or `gh` fallback, or leaves them in the report if no sink exists) and proceeds to Final Validation.
-   - `Accept and proceed` — record the residual findings verbatim in the PR description's "Known Residuals" section (the agent owns this when calling `ce-commit-push-pr` in Phase 4) and proceed. The user has acknowledged the risk.
+   - `Accept and proceed` — record the residual findings verbatim in a durable "Known Residuals" sink before shipping. If a PR will be created or updated in Phase 4, include them in the PR description's "Known Residuals" section (the agent owns this when calling `ce-commit-push-pr`). If the user later chooses the no-PR `ce-commit` path, create `docs/residual-review-findings/<branch-or-head-sha>.md`, include the accepted findings and source review-run context, stage it with the implementation commit, and mention the file path in the final summary. The user has acknowledged the risk, but the findings must not live only in the transient session.
    - `Stop — do not ship` — abort the shipping workflow. The user will handle findings manually before re-invoking.
 
-   Skip this gate entirely when the review reported `Residual actionable work: none.` or when only Tier 1 (inline self-review) was used.
+   Skip this gate entirely when the review reported `Residual actionable work: none.` or when only Tier 1 (inline self-review) was used. Do not proceed past this gate on an `Accept and proceed` decision until the agent has recorded whether the durable sink is `PR Known Residuals` or `docs/residual-review-findings/<branch-or-head-sha>.md`.
 
 4. **Final Validation**
    - All tasks marked completed
