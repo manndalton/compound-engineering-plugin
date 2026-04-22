@@ -20,7 +20,7 @@ Tool mapping:
 - WebFetch/WebSearch: use curl or Context7 for library docs
 - AskUserQuestion/Question: present choices as a numbered list in chat and wait for a reply number. For multi-select (multiSelect: true), accept comma-separated numbers. Never skip or auto-configure — always wait for the user's response before proceeding.
 - Task (subagent dispatch) / Subagent / Parallel: run sequentially in main thread; use multi_tool_use.parallel for tool calls
-- TaskCreate/TaskUpdate/TaskList/TaskGet (Claude Code task-tracking, current): use update_plan (Codex's task-tracking primitive)
+- TaskCreate/TaskUpdate/TaskList/TaskGet/TaskStop/TaskOutput (Claude Code task-tracking, current): use update_plan (Codex's task-tracking primitive)
 - TodoWrite/TodoRead (Claude Code task-tracking, legacy — deprecated, replaced by Task* tools): use update_plan
 - Skill: open the referenced SKILL.md and follow it
 - ExitPlanMode: ignore
