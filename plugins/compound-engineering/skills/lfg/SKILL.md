@@ -19,9 +19,21 @@ CRITICAL: You MUST execute every step below IN ORDER. Do NOT skip any required s
 
 4. `/ce-code-review mode:autofix plan:<plan-path-from-step-2>`
 
-   Pass the plan file path from step 2 so ce-code-review can verify requirements completeness.
+   Pass the plan file path from step 2 so ce-code-review can verify requirements completeness. Read the Residual Actionable Work summary the skill emits.
 
-5. `/ce-todo-resolve`
+5. **Autonomous residual handoff** (only when step 4 reported one or more residual `downstream-resolver` findings; skip when it reported `Residual actionable work: none.`)
+
+   Do not prompt the user. This step embraces the autopilot contract: residuals must become durable before DONE, but the agent never stops to ask.
+
+   1. Load `plugins/compound-engineering/skills/ce-code-review/references/tracker-defer.md` in **non-interactive mode**. Pass the residual actionable findings from step 4's summary (or the run artifact when the summary was truncated).
+   2. Collect the structured return: `{ filed: [...], failed: [...], no_sink: [...] }`.
+   3. Update the PR description by loading the `ce-commit-push-pr` skill in its update mode. Provide a `## Residual Review Findings` section composed from the structured return:
+      - For each item in `filed`: a bullet with severity, file:line, title, and a link to the tracker ticket URL.
+      - For each item in `failed`: a bullet with severity, file:line, title, and the failure reason (e.g., `Defer failed: gh returned 401 — tracker unavailable`).
+      - For each item in `no_sink`: a bullet with severity, file:line, and title inlined verbatim so the PR itself is the durable record.
+   4. If step 4 already ran after `ce-work` opened the PR, the update mode appends/replaces the `## Residual Review Findings` section on the existing PR. If no PR exists yet (edge case: `ce-work` stopped short of Phase 4), hand the composed section to the eventual `ce-commit-push-pr` invocation as additional context.
+
+   Never block DONE on residual handoff. A `no_sink` outcome is success as long as the findings are durably present in the PR body.
 
 6. `/ce-test-browser`
 

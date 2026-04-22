@@ -63,8 +63,6 @@ For `/ce-optimize`, see [`skills/ce-optimize/README.md`](./skills/ce-optimize/RE
 | `/ce-setup` | Diagnose environment, install missing tools, and bootstrap project config |
 | `/ce-update` | Check compound-engineering plugin version and fix stale cache (Claude Code only) |
 | `/ce-release-notes` | Summarize recent compound-engineering plugin releases, or answer a question about a past release with a version citation |
-| `/ce-todo-resolve` | Resolve todos in parallel |
-| `/ce-todo-triage` | Triage and prioritize pending todos |
 
 ### Development Frameworks
 
@@ -85,7 +83,6 @@ For `/ce-optimize`, see [`skills/ce-optimize/README.md`](./skills/ce-optimize/RE
 | Skill | Description |
 |-------|-------------|
 | `ce-proof` | Create, edit, and share documents via Proof collaborative editor |
-| `ce-todo-create` | File-based todo tracking system |
 
 ### Automation & Tools
 
