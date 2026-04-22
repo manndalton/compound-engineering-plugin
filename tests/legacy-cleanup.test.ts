@@ -227,13 +227,21 @@ describe("cleanupStaleSkillDirs", () => {
         "Optimize Claude Code permissions by finding safe Bash commands from session history and auto-applying them to settings.json. Can run from any coding agent but targets Claude Code specifically. Use when experiencing permission fatigue, too many permission prompts, wanting to optimize permissions, or needing to set up allowlists. Triggers on \"optimize permissions\", \"reduce permission prompts\", \"allowlist commands\", \"too many permission prompts\", \"permission fatigue\", \"permission setup\", or complaints about clicking approve too often.",
       ),
     )
+    await createDir(
+      path.join(root, "ce-onboarding"),
+      skillContent(
+        "ce-onboarding",
+        "Generate or regenerate ONBOARDING.md to help new contributors understand a codebase. Use when the user asks to 'create onboarding docs', 'generate ONBOARDING.md', 'document this project for new developers', 'write onboarding documentation', 'vonboard', 'vonboarding', 'prepare this repo for a new contributor', 'refresh the onboarding doc', or 'update ONBOARDING.md'. Also use when someone needs to onboard a new team member and wants a written artifact, or when a codebase lacks onboarding documentation and the user wants to generate one.",
+      ),
+    )
 
     const removed = await cleanupStaleSkillDirs(root)
 
-    expect(removed).toBe(3)
+    expect(removed).toBe(4)
     expect(await exists(path.join(root, "feature-video"))).toBe(false)
     expect(await exists(path.join(root, "reproduce-bug"))).toBe(false)
     expect(await exists(path.join(root, "claude-permissions-optimizer"))).toBe(false)
+    expect(await exists(path.join(root, "ce-onboarding"))).toBe(false)
   })
 
   test("preserves same-named user skills for legacy-only entries when content differs", async () => {
