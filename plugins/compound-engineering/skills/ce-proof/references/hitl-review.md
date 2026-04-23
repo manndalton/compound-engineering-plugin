@@ -161,7 +161,8 @@ Block `ref` values drift across revisions — re-fetch `/snapshot` for fresh ref
 
 **Retry after any error is verify-first, not retry-first.** The Proof API can commit canonically and still return a non-2xx or a 202 with `collab.status: "pending"`; network timeouts can hit after the server has already written. Retrying without verifying is the most common cause of duplicate marks (same comment twice, same suggestion twice) that then need a manual cleanup pass.
 
-- On `STALE_BASE` / `BASE_TOKEN_REQUIRED` / `MISSING_BASE` / `INVALID_BASE_TOKEN` / `ANCHOR_NOT_FOUND` / `ANCHOR_AMBIGUOUS`: treat as pre-commit. Re-read `/state`, refresh the payload (new baseToken, tighter anchor), retry once.
+- On `STALE_BASE` / `BASE_TOKEN_REQUIRED` / `MISSING_BASE` / `INVALID_BASE_TOKEN`: pre-commit, token-related. Re-read `/state`, send the same payload with a fresh `baseToken`, retry once. The `mutate()` helper below auto-retries these.
+- On `ANCHOR_NOT_FOUND` / `ANCHOR_AMBIGUOUS`: pre-commit, but the `quote` no longer matches uniquely. Re-read is not enough; the caller must tighten or regenerate the anchor before retrying. The helper surfaces the error instead of auto-retrying.
 - On `INVALID_OPERATIONS` / `INVALID_REQUEST` / `INVALID_REF` / `INVALID_BLOCK_MARKDOWN` / `INVALID_RANGE` / `INVALID_MARKDOWN` / 422: the payload is wrong. Do not retry — fix the payload and send a new write.
 - On `COLLAB_SYNC_FAILED` / `REWRITE_BARRIER_FAILED` / `PROJECTION_STALE` / `INTERNAL_ERROR` / 5xx / network error / timeout / **202 with `collab.status: "pending"`**: the write may have landed. Re-read `/state`, diff against the intended change (mark exists? suggestion applied? quote replaced?), and only retry if the server did not actually commit it. If the diff shows the write did land, treat the call as successful even though the response said otherwise.
 
@@ -312,8 +313,14 @@ mutate() {
     -H "Idempotency-Key: $IDEM_KEY" \
     -d "$BODY")
   CODE=$(printf '%s' "$RESP" | jq -r '.code // .error // empty')
-  # Pre-commit, safe to retry after re-reading state.
-  if [ "$CODE" = "STALE_BASE" ] || [ "$CODE" = "BASE_TOKEN_REQUIRED" ] || [ "$CODE" = "MISSING_BASE" ]; then
+  # Pre-commit token-related errors — safe to auto-retry with the same
+  # payload and a fresh baseToken. Anchor errors (ANCHOR_NOT_FOUND,
+  # ANCHOR_AMBIGUOUS) are also pre-commit but require a tighter quote,
+  # so they are surfaced instead of auto-retried.
+  if [ "$CODE" = "STALE_BASE" ] \
+    || [ "$CODE" = "BASE_TOKEN_REQUIRED" ] \
+    || [ "$CODE" = "MISSING_BASE" ] \
+    || [ "$CODE" = "INVALID_BASE_TOKEN" ]; then
     BASE=$(curl -s "https://www.proofeditor.ai/api/agent/$SLUG/state" \
       -H "x-share-token: $TOKEN" | jq -r '.mutationBase.token')
     BODY=$(jq -n --arg base "$BASE" --argjson payload "$PAYLOAD" '$payload + {baseToken: $base}')
