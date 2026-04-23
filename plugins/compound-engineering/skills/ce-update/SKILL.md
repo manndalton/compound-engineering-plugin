@@ -35,7 +35,10 @@ so the currently-loaded version is the basename two `dirname` levels up.
 !`gh release list --repo EveryInc/compound-engineering-plugin --limit 30 --json tagName --jq '[.[] | select(.tagName | startswith("compound-engineering-v"))][0].tagName | sub("compound-engineering-v";"")' 2>/dev/null || echo '__CE_UPDATE_VERSION_FAILED__'`
 
 **Currently loaded version:**
-!`case "${CLAUDE_SKILL_DIR}" in "${HOME}/.claude/plugins/cache/"*/compound-engineering/*/skills/ce-update) basename "$(dirname "$(dirname "${CLAUDE_SKILL_DIR}")")" ;; *) echo '__CE_UPDATE_NOT_MARKETPLACE__' ;; esac`
+!`case "${CLAUDE_SKILL_DIR}" in */plugins/cache/*/compound-engineering/*/skills/ce-update) basename "$(dirname "$(dirname "${CLAUDE_SKILL_DIR}")")" ;; *) echo '__CE_UPDATE_NOT_MARKETPLACE__' ;; esac`
+
+**Marketplace name:**
+!`case "${CLAUDE_SKILL_DIR}" in */plugins/cache/*/compound-engineering/*/skills/ce-update) basename "$(dirname "$(dirname "$(dirname "$(dirname "${CLAUDE_SKILL_DIR}")")")")" ;; *) echo '__CE_UPDATE_NOT_MARKETPLACE__' ;; esac`
 
 ## Decision logic
 
@@ -75,11 +78,13 @@ Then stop.
 >
 > Update with:
 > ```
-> claude plugin update compound-engineering@every-marketplace
+> claude plugin update compound-engineering@{marketplace-name}
 > ```
 > Then restart Claude Code to apply."
 
 The `claude plugin update` command ships with Claude Code itself and updates
 installed plugins to their latest version; it replaces earlier manual cache
-sweep / marketplace-refresh workarounds. The marketplace name
-`every-marketplace` is fixed — that's where this plugin is published.
+sweep / marketplace-refresh workarounds. The marketplace name is derived from
+the skill path rather than hardcoded because this plugin is distributed under
+multiple marketplace names (for example, `compound-engineering-plugin` for
+public installs per the README, or other names for internal/team marketplaces).
