@@ -110,6 +110,12 @@ Determine how to proceed based on what was provided in `<input_document>`.
    - If anything is unclear or ambiguous, ask clarifying questions now
    - If clarifying questions were needed above, get user approval on the resolved answers. If no clarifications were needed, proceed without a separate approval step — plan scope is the plan's authority, not something to renegotiate
    - **Do not skip this** - better to ask questions now than build the wrong thing
+   - **Infer resume state from git and the working tree when relevant.** The plan body carries no per-unit progress state; git (plus any uncommitted changes) is the honest answer for "what's done." For each implementation unit, examine commits on the current branch **and** the current state of files listed in the unit's `Files:` section (including uncommitted edits), then classify as **done** (implementation present, tests present or explicitly N/A per the plan), **partial** (some files changed but gaps remain — this covers uncommitted WIP as well as incomplete commits), or **not-started**. Report the assessment with evidence (commit SHAs, file paths) before building the task list. If any classification is uncertain, ask the user rather than guessing. Skip this inference entirely when any of:
+     - No plan file is present (bare-prompt work has no units to reconcile)
+     - The plan's `status` is `completed` or `abandoned`
+     - The current branch has no commits ahead of the base branch **and** the working tree has no uncommitted changes to files listed in any unit's `Files:` section (no applied work of any kind — committed or in-progress)
+     - The task tracker already holds populated unit tasks from the same session (working memory is authoritative within a session)
+   - **Do not edit the plan body during execution.** The plan is a decision artifact; progress lives in git commits and the task tracker. The only plan mutation during ce-work is the final `status: active → completed` flip at shipping (see `references/shipping-workflow.md` Phase 4 Step 2). Legacy plans may contain `- [ ]` / `- [x]` marks on unit headings — ignore them as state; the git inference above is authoritative.
 
 2. **Setup Environment**
 
@@ -176,6 +182,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
    - Prioritize based on what needs to be done first
    - Include testing and quality check tasks
    - Keep tasks specific and completable
+   - If resume-state inference (step 1) classified any units as **done**, create their tasks and immediately mark them completed so the task list reflects reality. Classify **partial** units as open tasks with a brief note of what's already present. **Not-started** units become regular new tasks.
 
 4. **Choose Execution Strategy**
 
@@ -213,7 +220,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
    1. Review the subagent's diff — verify changes match the unit's scope and `Files:` list
    2. Run the relevant test suite to confirm the tree is healthy
    3. If tests fail, diagnose and fix before proceeding — do not dispatch dependent units on a broken tree
-   4. Update the plan checkboxes and task list
+   4. Update the task list (do not edit the plan body — progress is carried by the commit)
    5. Dispatch the next unit
 
    **After all parallel subagents in a batch complete:**
@@ -221,7 +228,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
    2. Cross-check for discovered file collisions: compare the actual files modified by all subagents in the batch (not just their declared `Files:` lists). Subagents may create or modify files not anticipated during planning — this is expected, since plans describe *what* not *how*. A collision only matters when 2+ subagents in the same batch modified the same file. In a shared working directory, only the last writer's version survives — the other unit's changes to that file are lost. If a collision is detected: commit all non-colliding files from all units first, then re-run the affected units serially for the shared file so each builds on the other's committed work
    3. For each completed unit, in dependency order: review the diff, run the relevant test suite, stage only that unit's files, and commit with a conventional message derived from the unit's Goal
    4. If tests fail after committing a unit's changes, diagnose and fix before committing the next unit
-   5. Update the plan checkboxes and task list
+   5. Update the task list (do not edit the plan body — progress is carried by the commits just made)
    6. Dispatch the next batch of independent units, or the next dependent unit
 
 ### Phase 2: Execute
