@@ -145,7 +145,7 @@ Ask what should happen next using the platform's blocking question tool: `AskUse
 
 **Question:** "What should the agent do next?"
 
-Offer these four options (each label is self-contained per the Interactive Question Tool Design rules in the plugin AGENTS.md — the distinguishing word is front-loaded so options stay distinct when truncated):
+Offer these four options (labels are self-contained with the distinguishing word front-loaded so options stay distinct when truncated):
 
 1. **Refine the ideation in conversation (or stop here — no save)** — add ideas, re-evaluate, or deepen analysis. No file or network side effects; ending the conversation at any point after this pick is a valid no-save exit.
 2. **Open and iterate in Proof** — save the ideation to Proof and enter the proof skill's HITL review loop: iterate via comments in the Proof editor; reviewed edits sync back to `docs/ideation/` in repo mode.
