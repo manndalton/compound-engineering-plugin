@@ -57,12 +57,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
    - If anything is unclear or ambiguous, ask clarifying questions now
    - If clarifying questions were needed above, get user approval on the resolved answers. If no clarifications were needed, proceed without a separate approval step — plan scope is the plan's authority, not something to renegotiate
    - **Do not skip this** - better to ask questions now than build the wrong thing
-   - **Infer resume state from git and the working tree when relevant.** The plan body carries no per-unit progress state; git (plus any uncommitted changes) is the honest answer for "what's done." For each implementation unit, examine commits on the current branch **and** the current state of files listed in the unit's `Files:` section (including uncommitted edits), then classify as **done** (implementation present, tests present or explicitly N/A per the plan), **partial** (some files changed but gaps remain — this covers uncommitted WIP as well as incomplete commits), or **not-started**. Report the assessment with evidence (commit SHAs, file paths) before building the task list. If any classification is uncertain, ask the user rather than guessing. Skip this inference entirely when any of:
-     - No plan file is present (bare-prompt work has no units to reconcile)
-     - The plan's `status` is `completed` or `abandoned`
-     - The current branch has no commits ahead of the base branch **and** the working tree has no uncommitted changes to files listed in any unit's `Files:` section (no applied work of any kind — committed or in-progress)
-     - The task tracker already holds populated unit tasks from the same session (working memory is authoritative within a session)
-   - **Do not edit the plan body during execution.** The plan is a decision artifact; progress lives in git commits and the task tracker. The only plan mutation during ce-work is the final `status: active → completed` flip at shipping (see `references/shipping-workflow.md` Phase 4 Step 2). Legacy plans may contain `- [ ]` / `- [x]` marks on unit headings — ignore them as state; the git inference above is authoritative.
+   - **Do not edit the plan body during execution.** The plan is a decision artifact; progress lives in git commits and the task tracker. The only plan mutation during ce-work is the final `status: active → completed` flip at shipping (see `references/shipping-workflow.md` Phase 4 Step 2). Legacy plans may contain `- [ ]` / `- [x]` marks on unit headings — ignore them as state; per-unit completion is determined during execution by reading the current file state.
 
 2. **Setup Environment**
 
@@ -129,7 +124,6 @@ Determine how to proceed based on what was provided in `<input_document>`.
    - Prioritize based on what needs to be done first
    - Include testing and quality check tasks
    - Keep tasks specific and completable
-   - If resume-state inference (step 1) classified any units as **done**, create their tasks and immediately mark them completed so the task list reflects reality. Classify **partial** units as open tasks with a brief note of what's already present. **Not-started** units become regular new tasks.
 
 4. **Choose Execution Strategy**
 
@@ -186,6 +180,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
    while (tasks remain):
      - Mark task as in-progress
      - Read any referenced files from the plan or discovered during Phase 0
+     - **If the unit's work is already present and matches the plan's intent** (files exist with the expected capability, or the unit's `Verification` criteria are already satisfied by the current code), the work has likely shipped on a prior branch or session. Verify it matches, mark the task complete, and move on. Do not silently reimplement.
      - Look for similar patterns in codebase
      - Find existing test files for implementation files being changed (Test Discovery — see below)
      - Implement following existing conventions
