@@ -1,6 +1,6 @@
 # Per-finding Walk-through
 
-This reference defines Interactive mode's per-finding walk-through — the path the user enters by picking option A (`Review each finding one by one — accept the recommendation or choose another action`) from the routing question. It also covers the unified completion report that every terminal path (walk-through, LFG, File tickets, zero findings) emits.
+This reference defines Interactive mode's per-finding walk-through — the path the user enters by picking option A (`Review each finding one by one — accept the recommendation or choose another action`) from the routing question. It also covers the unified completion report that every terminal path (walk-through, best-judgment, File tickets, zero findings) emits.
 
 Interactive mode only.
 
@@ -114,7 +114,7 @@ Fixed order. Never reorder:
 1. Apply the proposed fix
 2. Defer — file a [TRACKER] ticket
 3. Skip — don't apply, don't track
-4. LFG the rest — apply the agent's best judgment to this and remaining findings
+4. Auto-resolve with best judgment on the rest
 ```
 
 Render the `[TRACKER]` label per `tracker-defer.md`: when `confidence = high` AND `named_sink_available = true`, replace `[TRACKER]` with the concrete tracker name (e.g., `Defer — file a Linear ticket`). When `any_sink_available = true` but either `confidence = low` or `named_sink_available = false`, use the generic whole label `Defer — file a ticket` — whole-label substitution, not a `[TRACKER]` token swap.
@@ -125,14 +125,14 @@ Render the `[TRACKER]` label per `tracker-defer.md`: when `confidence = high` AN
 1. Apply the proposed fix  (recommended)
 2. Defer — file a ticket
 3. Skip — don't apply, don't track
-4. LFG the rest
+4. Auto-resolve with best judgment on the rest
 ```
 
 ```
 1. Apply the proposed fix
 2. Defer — file a ticket
 3. Skip — don't apply, don't track  (recommended)
-4. LFG the rest
+4. Auto-resolve with best judgment on the rest
 ```
 
 When reviewers disagreed or content context cuts against the default, still mark one option — whichever Stage 5 step 7b produced — and surface the disagreement in the R15 conflict context line.
@@ -140,8 +140,8 @@ When reviewers disagreed or content context cuts against the default, still mark
 ### Adaptations
 
 - **Advisory-only finding:** when the finding's `autofix_class` is `advisory` (no actionable fix), option A is replaced with `Acknowledge — mark as reviewed`. The other three options remain. The advisory variant is the only case where `Acknowledge` appears in the menu.
-- **N=1 (exactly one pending finding):** the terminal block's heading omits `Finding N of M` and renders as `## {severity} {plain-English title}`. The stem's first line drops the position counter, becoming `{severity} {short handle}.` Option D (`LFG the rest`) is suppressed because no subsequent findings exist — the menu shows three options: Apply / Defer / Skip (or Acknowledge, for advisory).
-- **No sink (Defer option unavailable):** when the tracker-detection tuple reports `any_sink_available: false` (every tier in the fallback chain — named tracker and GitHub Issues via `gh` — is unreachable), option B (`Defer`) is omitted. The stem appends one line explaining why (e.g., `Defer unavailable on this platform — no durable tracker sink detected.`). The menu shows three options: Apply / Skip / LFG the rest (and Acknowledge in place of Apply for advisory-only findings). **Before rendering the options, remap any per-finding `Defer` recommendation produced by Stage 5 step 7b to `Skip`** so the `(recommended)` marker always lands on an option that is actually in the menu. When the remap fires, surface it on the R15 conflict context line (e.g., `Stage 5 recommended Defer; downgraded to Skip — no tracker sink available.`). This is a render-time runtime step; Stage 5 step 7b has no knowledge of sink availability and only orders conflicting reviewer recommendations.
+- **N=1 (exactly one pending finding):** the terminal block's heading omits `Finding N of M` and renders as `## {severity} {plain-English title}`. The stem's first line drops the position counter, becoming `{severity} {short handle}.` Option D (`Auto-resolve with best judgment on the rest`) is suppressed because no subsequent findings exist — the menu shows three options: Apply / Defer / Skip (or Acknowledge, for advisory).
+- **No sink (Defer option unavailable):** when the tracker-detection tuple reports `any_sink_available: false` (every tier in the fallback chain — named tracker and GitHub Issues via `gh` — is unreachable), option B (`Defer`) is omitted. The stem appends one line explaining why (e.g., `Defer unavailable on this platform — no durable tracker sink detected.`). The menu shows three options: Apply / Skip / Auto-resolve with best judgment on the rest (and Acknowledge in place of Apply for advisory-only findings). **Before rendering the options, remap any per-finding `Defer` recommendation produced by Stage 5 step 7b to `Skip`** so the `(recommended)` marker always lands on an option that is actually in the menu. When the remap fires, surface it on the R15 conflict context line (e.g., `Stage 5 recommended Defer; downgraded to Skip — no tracker sink available.`). This is a render-time runtime step; Stage 5 step 7b has no knowledge of sink availability and only orders conflicting reviewer recommendations.
 - **Combined N=1 + no sink:** the menu shows two options: Apply / Skip (or Acknowledge / Skip).
 
 Only when `ToolSearch` explicitly returns no match or the tool call errors — or on a platform with no blocking question tool — fall back to presenting the options as a numbered list and waiting for the user's next reply.
@@ -156,7 +156,7 @@ For each finding's answer:
 - **Acknowledge — mark as reviewed** (advisory variant) — record Acknowledge in the in-memory decision list. Advance to the next finding. No side effects.
 - **Defer — file a [TRACKER] ticket** — invoke the tracker-defer flow from `tracker-defer.md`. The walk-through's position indicator stays on the current finding during any failure-path sub-question (Retry / Fall back / Convert to Skip). On success, record the tracker URL / reference in the in-memory decision list and advance. On conversion-to-Skip from the failure path, advance with the failure noted in the completion report.
 - **Skip — don't apply, don't track** — record Skip in the in-memory decision list. Advance. No side effects.
-- **LFG the rest — apply the agent's best judgment to this and remaining findings** — exit the walk-through loop and dispatch the fixer subagent (`SKILL.md` Step 3) immediately on the remaining action set: the current finding plus everything not yet decided. No Stage 5b pre-pass. No bulk-preview approval gate. The fixer applies items with concrete `suggested_fix`, no-ops on advisory items, and routes items where the fix cannot be applied cleanly (or where evidence no longer matches the code) to a `failed` bucket with a one-line reason. Apply findings the user already picked during the walk-through are dispatched in the same fixer pass — the remaining set joins the in-memory Apply set so the fixer receives the union and applies all changes against a consistent tree. After the fixer returns, follow the post-run failure-handling logic in `SKILL.md` Step 2 Interactive option B — when the `failed` bucket is non-empty, fire one question with three options (file tickets / walk through / ignore). When the `failed` bucket is empty, emit the unified completion report directly.
+- **Auto-resolve with best judgment on the rest** — exit the walk-through loop and dispatch the fixer subagent (`SKILL.md` Step 3) immediately on the remaining action set: the current finding plus everything not yet decided. No Stage 5b pre-pass. No bulk-preview approval gate. The fixer applies items with concrete `suggested_fix`, no-ops on advisory items, and routes items where the fix cannot be applied cleanly (or where evidence no longer matches the code) to a `failed` bucket with a one-line reason. Apply findings the user already picked during the walk-through are dispatched in the same fixer pass — the remaining set joins the in-memory Apply set so the fixer receives the union and applies all changes against a consistent tree. After the fixer returns, follow the post-run failure-handling logic in `SKILL.md` Step 2 Interactive option B — when the `failed` bucket is non-empty, fire one question with three options (file tickets / walk through / ignore). When the `failed` bucket is empty, emit the unified completion report directly.
 
 ---
 
@@ -182,7 +182,7 @@ Formal cross-session resumption is out of scope for v1.
 
 ## End-of-walk-through dispatch
 
-This section covers the run-to-completion path only — every finding has been answered Apply / Defer / Skip / Acknowledge and the loop ended naturally. The `LFG the rest` path exits the walk-through earlier and dispatches its own fixer pass on the union of (accumulated Apply set ∪ remaining undecided findings); see the `LFG the rest` bullet under "Per-finding routing" above. There is no second dispatch in that branch.
+This section covers the run-to-completion path only — every finding has been answered Apply / Defer / Skip / Acknowledge and the loop ended naturally. The `Auto-resolve with best judgment on the rest` path exits the walk-through earlier and dispatches its own fixer pass on the union of (accumulated Apply set ∪ remaining undecided findings); see that bullet under "Per-finding routing" above. There is no second dispatch in that branch.
 
 When the loop runs to completion, the walk-through hands off to the dispatch phase:
 
@@ -199,8 +199,8 @@ After dispatch completes, emit the unified completion report described below.
 Every terminal path of Interactive mode emits the same completion report structure. This covers:
 
 - Walk-through completed (all findings answered)
-- Walk-through bailed via `LFG the rest`
-- Top-level LFG (routing option B) completed
+- Walk-through bailed via `Auto-resolve with best judgment on the rest`
+- Top-level best-judgment (routing option B) completed
 - Top-level File tickets (routing option C) completed
 - Zero findings after `safe_auto` (routing question was skipped — the completion summary is a one-line degenerate case of this structure)
 

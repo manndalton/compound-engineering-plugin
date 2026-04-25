@@ -4,7 +4,7 @@ This reference defines the compact plan preview that Interactive mode shows befo
 
 Interactive mode only. Option C only.
 
-The LFG path (routing option B and the walk-through's `LFG the rest`) does **not** use the bulk preview. LFG dispatches the fixer immediately and surfaces failures in a post-run question, per the `(B)` handler in `SKILL.md` Step 2 Interactive mode. Filing tickets is the one bulk action that benefits from a preview because filing produces durable external state that is expensive to undo — applying local fixes on uncommitted edits is not.
+The best-judgment path (routing option B and the walk-through's `Auto-resolve with best judgment on the rest`) does **not** use the bulk preview. The best-judgment path dispatches the fixer immediately and surfaces failures in a post-run question, per the `(B)` handler in `SKILL.md` Step 2 Interactive mode. Filing tickets is the one bulk action that benefits from a preview because filing produces durable external state that is expensive to undo — applying local fixes on uncommitted edits is not.
 
 ---
 

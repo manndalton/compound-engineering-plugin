@@ -154,7 +154,7 @@ Rules:
   - **Genuinely-omit cases are rare.** Omit `suggested_fix` only when there is no code-level change to propose — for example:
     - The finding is a question, not a fix request: "What is the intended SLA here?" with no clear default to assume.
     - The resolution is purely organizational with no code component: legal sign-off, business policy decision, or a process change that doesn't touch code.
-    These shapes are the exception, not the norm. Most "manual" findings in code review have a defensible code-level proposal even when context is incomplete. A `manual` finding without `suggested_fix` routes to the LFG `failed` bucket with reason "no fix proposed by reviewer" — owning that omission is the persona's responsibility.
+    These shapes are the exception, not the norm. Most "manual" findings in code review have a defensible code-level proposal even when context is incomplete. A `manual` finding without `suggested_fix` routes to the best-judgment path's `failed` bucket with reason "no fix proposed by reviewer" — owning that omission is the persona's responsibility.
   A bad fix suggestion is still worse than none — the false-positive catalog and grounding rule above prevent that. The bias is toward proposing when you can; the omission case is narrow.
 - If you find no issues, return an empty findings array. Still populate residual_risks and testing_gaps if applicable.
 - **Intent verification:** Compare the code changes against the stated intent (and PR title/body when available). If the code does something the intent does not describe, or fails to do something the intent promises, flag it as a finding. Mismatches between stated intent and actual code are high-value findings.

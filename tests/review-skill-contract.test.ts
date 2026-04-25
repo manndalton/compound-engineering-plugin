@@ -80,12 +80,12 @@ describe("ce-code-review contract", () => {
     // as a routing-option label so truncation-safe menus stay intact.
     // Assert presence rather than exact copy — wording can be improved without breaking the test.
     expect(content).toMatch(/\(A\)\s*`Review each finding one by one/)
-    expect(content).toMatch(/\(B\)\s*`LFG\./)
+    expect(content).toMatch(/\(B\)\s*Auto-resolve with best judgment/)
     expect(content).toMatch(/\(C\)\s*`File a \[TRACKER\] ticket/)
     expect(content).toMatch(/\(D\)\s*`Report only/)
 
     // The new routing question dispatches to focused reference files, not inline prose.
-    // bulk-preview.md is now invoked by option C only (the LFG path no longer uses it).
+    // bulk-preview.md is now invoked by option C only (the best-judgment path no longer uses it).
     expect(content).toContain("references/walkthrough.md")
     expect(content).toContain("references/bulk-preview.md")
     expect(content).toContain("references/tracker-defer.md")
@@ -140,16 +140,16 @@ describe("ce-code-review contract", () => {
     expect(subagentTemplate).toMatch(/required/i)
 
     // walkthrough.md carries the four per-finding option labels (Apply / Defer / Skip /
-    // LFG the rest). Assert presence of each distinguishing word so renaming an option
-    // breaks the test. Exact label wording may be refined for clarity — these assertions
-    // check the structural contract, not the prose.
+    // Auto-resolve with best judgment on the rest). Assert presence of each distinguishing
+    // word so renaming an option breaks the test. Exact label wording may be refined for
+    // clarity — these assertions check the structural contract, not the prose.
     const walkthrough = await readRepoFile(
       "plugins/compound-engineering/skills/ce-code-review/references/walkthrough.md",
     )
     expect(walkthrough).toContain("Apply the proposed fix")
     expect(walkthrough).toContain("Defer — file a [TRACKER] ticket")
     expect(walkthrough).toContain("Skip — don't apply, don't track")
-    expect(walkthrough).toMatch(/LFG the rest/)
+    expect(walkthrough).toMatch(/Auto-resolve with best judgment on the rest/)
 
     // bulk-preview.md contract: exactly Proceed / Cancel, no third option.
     const bulkPreview = await readRepoFile(
@@ -288,18 +288,18 @@ describe("ce-code-review contract", () => {
     expect(content).toContain("### Stage 5b: Validation pass")
 
     // Mode-conditional dispatch — runs on autofix/headless/option C; explicitly does NOT
-    // run on the LFG path (option B and walk-through `LFG the rest`).
+    // run on the best-judgment path (option B and walk-through's auto-resolve-the-rest).
     expect(content).toContain("`headless`")
     expect(content).toContain("`autofix`")
     expect(content).toContain("walk-through routing (option A)")
-    expect(content).toContain("LFG routing (option B)")
+    expect(content).toContain("best-judgment routing (option B)")
     expect(content).toContain("File-tickets routing (option C)")
     expect(content).toMatch(/Report-only routing.*nothing is being externalized/i)
 
-    // LFG path explicitly skips Stage 5b — the fixer's apply/fail outcome is the validation.
-    expect(content).toMatch(/LFG routing \(option B\) \| No --/)
-    expect(content).toMatch(/LFG-the-rest handoff \| No --/)
-    expect(content).toMatch(/LFG path skips Stage 5b deliberately/i)
+    // Best-judgment path explicitly skips Stage 5b — the fixer's apply/fail outcome is the validation.
+    expect(content).toMatch(/best-judgment routing \(option B\) \| No --/)
+    expect(content).toMatch(/best-judgment-the-rest handoff \| No --/)
+    expect(content).toMatch(/best-judgment path skips Stage 5b deliberately/i)
 
     // Per-finding parallel dispatch (not batched)
     expect(content).toMatch(/per.finding parallel dispatch/i)
@@ -311,10 +311,10 @@ describe("ce-code-review contract", () => {
 
     // Option C invokes validation before externalizing (option B no longer does).
     expect(content).toMatch(/\(C\)\s*`File a \[TRACKER\].*first run Stage 5b validation/)
-    expect(content).not.toMatch(/\(B\)\s*`LFG.*first run Stage 5b validation/)
+    expect(content).not.toMatch(/\(B\).*first run Stage 5b validation/)
 
     // Option B dispatches the fixer immediately — no Stage 5b, no bulk-preview.
-    expect(content).toMatch(/\(B\)\s*`LFG.*dispatch the fixer subagent.*immediately/i)
+    expect(content).toMatch(/\(B\)\s*`Auto-resolve with best judgment.*dispatch the fixer subagent.*immediately/i)
     expect(content).toMatch(/No Stage 5b validator pre-pass/i)
     expect(content).toMatch(/No bulk-preview approval gate/i)
 
@@ -326,7 +326,7 @@ describe("ce-code-review contract", () => {
     expect(validatorTemplate).toMatch(/handled elsewhere/i)
   })
 
-  test("LFG path post-run failure-handling question fires only when failed bucket non-empty", async () => {
+  test("best-judgment path post-run failure-handling question fires only when failed bucket non-empty", async () => {
     const content = await readRepoFile("plugins/compound-engineering/skills/ce-code-review/SKILL.md")
 
     // Post-run question fires when the fixer's `failed` bucket is non-empty.
@@ -339,11 +339,11 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/Omit this option when.*any_sink_available\s*=\s*false/i)
   })
 
-  test("fixer subagent contract supports heterogeneous LFG queue", async () => {
+  test("fixer subagent contract supports heterogeneous best-judgment queue", async () => {
     const content = await readRepoFile("plugins/compound-engineering/skills/ce-code-review/SKILL.md")
 
     // Step 3 documents both queue shapes: homogeneous (autofix/headless/walk-through Apply)
-    // and heterogeneous (LFG path with gated_auto + manual + advisory).
+    // and heterogeneous (best-judgment path with gated_auto + manual + advisory).
     expect(content).toMatch(/Heterogeneous queue/i)
     expect(content).toMatch(/`gated_auto`,\s*`manual`,\s*and\s*`advisory`/i)
 
@@ -352,8 +352,8 @@ describe("ce-code-review contract", () => {
     expect(content).toMatch(/evidence no longer matches code/i)
     expect(content).toMatch(/fix did not apply cleanly/i)
 
-    // LFG path is single-pass; bounded re-review applies to autofix and walk-through Apply.
-    expect(content).toMatch(/LFG path is single-pass/i)
+    // Best-judgment path is single-pass; bounded re-review applies to autofix and walk-through Apply.
+    expect(content).toMatch(/Best-judgment path is single-pass/i)
     expect(content).toMatch(/max_rounds:\s*2/)
 
     // Fixer return shape includes the {applied, failed, advisory} partition.
