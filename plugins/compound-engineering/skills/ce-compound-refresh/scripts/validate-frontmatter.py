@@ -16,15 +16,18 @@ intent is to prevent the silent-data-loss bug class where YAML's quoting
 rules truncate or reframe scalar values without raising.
 
 Checks (regex-based, no YAML parser dependency):
-    1. File starts with `---\\n` and has a closing `---`
+    1. File starts and ends frontmatter with `---` lines (matched as full
+       lines, not substrings — `----` and `---extra` are rejected)
     2. No top-level scalar value contains ` #` unquoted (silent comment
        truncation — what Codex caught on PR #695)
-    3. No top-level scalar value contains `: ` unquoted (mapping confusion)
-    4. No top-level scalar value starts unquoted with a YAML reserved
-       indicator that takes effect without trailing whitespace (`` ` ``,
-       `*`, `&`, `!`, `|`, `>`, `%`, `@`). Note that `-` and `?` are list /
-       complex-key markers only when followed by whitespace; bare `-foo` and
-       `?foo` are valid plain scalars and are not flagged.
+    3. No top-level scalar value contains `: ` unquoted (mapping confusion —
+       what surfaced in a 2026-04-16 plan doc's `title:` field)
+
+The script does NOT flag values starting with YAML reserved indicators
+(`` ` ``, `*`, `&`, `!`, etc.) because those produce loud parser errors
+downstream rather than silent corruption — they're already caught by
+whatever consumes the doc. This validator's purpose is silent-corruption
+prevention, not lint.
 
 Pure-stdlib (no PyYAML or other third-party deps). Runs in <50ms typical.
 Designed to produce concrete, actionable error messages so the calling
@@ -81,8 +84,8 @@ def main(argv: list[str]) -> int:
 
     fm_text = "\n".join(lines[1:end_idx])
 
-    # Checks 2, 3, 4: scalar quoting risks on top-level scalar fields.
-    # We scan line-by-line and only flag top-level mapping entries
+    # Checks 2 & 3: silent-corruption quoting risks on top-level scalar
+    # fields. We scan line-by-line and only flag top-level mapping entries
     # (no leading whitespace) whose value isn't already quoted/structured.
     for lineno, line in enumerate(fm_text.split("\n"), start=2):
         stripped = line.lstrip()
@@ -118,15 +121,6 @@ def main(argv: list[str]) -> int:
             issues.append(
                 f"line {lineno}: '{key.strip()}' value contains ': ' — quote it. "
                 "Strict YAML parsers may treat this as a nested mapping."
-            )
-        # `-` and `?` are list / complex-key markers only when followed by
-        # whitespace — bare `-foo` and `?foo` parse as valid plain scalars,
-        # so we don't flag them. `* & ! | > % @ ` are reserved or take
-        # effect at the first character without needing trailing whitespace.
-        if val_stripped[0] in ("`", "*", "&", "!", "|", ">", "%", "@"):
-            issues.append(
-                f"line {lineno}: '{key.strip()}' value starts with reserved "
-                f"indicator '{val_stripped[0]}' — quote it."
             )
 
     if issues:

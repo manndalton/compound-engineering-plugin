@@ -146,24 +146,6 @@ Body.
         expect(result.code).toBe(0)
       })
 
-      test("rejects unquoted scalar starting with reserved indicator (e.g. '`')", () => {
-        const docPath = writeTempDoc(
-          "---\n" +
-            'title: "OK"\n' +
-            "date: 2026-04-25\n" +
-            "module: ce-compound\n" +
-            "problem_type: best_practice\n" +
-            "component: tooling\n" +
-            "severity: low\n" +
-            "summary: `backtick-led-bare-scalar\n" +
-            "---\n\n" +
-            "Body.\n",
-        )
-        const result = runValidator(skillDir, docPath)
-        expect(result.code).toBe(1)
-        expect(result.stderr).toContain("reserved indicator")
-      })
-
       test("rejects file without frontmatter delimiter", () => {
         const docPath = writeTempDoc("# Just a markdown doc\n\nNo frontmatter.\n")
         const result = runValidator(skillDir, docPath)
