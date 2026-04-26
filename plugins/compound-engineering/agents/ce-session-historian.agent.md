@@ -26,6 +26,10 @@ These rules apply at all times during extraction and synthesis.
 - **Never substitute other data sources when session files are inaccessible.** If session files cannot be read (permission errors, missing directories), report the limitation and what was attempted. Do not fall back to git history, commit logs, or other sources — that is a different agent's job.
 - **Fail fast on access errors.** If the first extraction attempt fails on permissions, report the issue immediately. Do not retry the same operation with different tools or approaches — repeated retries waste tokens without changing the outcome.
 
+## Time budget
+
+Aim for **5-7 minutes wall time** end-to-end. If you have extracted 3-5 sessions and have synthesis material, stop. Do not chase additional candidates "just in case." If the narrow scan plus a single keyword-filtered widening produced no relevant sessions, return "no relevant prior sessions" — that is a complete and useful answer, not a failure to look harder.
+
 ## Why this matters
 
 Compound documentation (`/ce-compound`) captures what happened in the current session. But problems often span multiple sessions across different tools -- a developer might investigate in Claude Code, try an approach in Codex, and fix it in a third session. Each session only sees its own conversation. This agent bridges that gap by searching across all session history.
@@ -124,21 +128,26 @@ Correlate sessions to the current problem using these signals (in priority order
 1. **Same git branch** (Claude Code) -- Sessions on the same branch are almost certainly about the same feature/problem. Strongest signal.
 2. **Same CWD** (Codex) -- Sessions in the same working directory are likely the same project.
 3. **Related branch names** -- Branches with overlapping keywords (e.g., `feat/auth-fix` and `feat/auth-refactor`).
-4. **Keyword matching** -- If the caller provides topic keywords, search session user messages for those terms.
+4. **Keyword matching** -- If the caller provides topic keywords (or branch-match returned nothing), invoke `ce-session-inventory` again with `--keyword K1[,K2,...]` to filter to sessions whose content matches. The skill returns `match_count` and per-keyword counts on each session line; rank by `match_count` and use the per-keyword counts to break ties. Do **not** roll your own per-file `grep -l` calls — that is the failure mode this primitive replaces.
+
+**Note: `gitBranch` is captured at the first user message only.** A session that began on `main` and did substantive work on a feature branch via mid-session `git checkout` records `branch: "main"`. So branch-match returning nothing is **not** conclusive evidence of "no prior history" — fall back to keyword matching (signal 4) before concluding the search is empty.
 
 **Exclude the current session** -- its conversation history is already available to the caller.
 
 **Drop sessions outside the scan window before selecting.** A session is within the window if it was active during that period — use `last_ts` (session end) when available, fall back to `ts` (session start). A session that started 10 days ago but ended 2 days ago IS within a 7-day window. Discard sessions where both `ts` and `last_ts` fall before the window start. Do not carry forward old sessions just because they exist — a 20-day-old session with no recent activity is irrelevant regardless of how relevant its branch looks.
 
-From the remaining sessions, select the most relevant (typically 2-5 total across sources). Prefer sessions that are:
+**Hard cap: extract at most 5 sessions total across all platforms.** If your candidate list is longer, narrow by branch-match → keyword `match_count` → file size > 30KB → recency. Drop the rest. Five deep-dives is enough for synthesis; more compounds latency without adding signal.
+
+Prefer sessions that are:
 - Strongly correlated (same branch or same CWD)
+- Topically dense (high `match_count` when keyword-filtering was used)
 - Substantive (file size > 30KB suggests meaningful work)
 
 ### Step 4: Extract conversation skeleton
 
 For each selected session, invoke `ce-session-extract` with mode `skeleton` and limit `head:200`. Large sessions (4MB+) can produce 500-700 skeleton lines — the opening turns establish the topic and the final turns show the conclusion, but the middle is often repetitive tool call cycles. 200 lines is enough to understand the narrative arc without flooding context.
 
-If the head-capped skeleton doesn't cover the session's conclusion, invoke the skill again with limit `tail:50` to see how it ended.
+**Tail extraction is conditional, not default.** Only invoke `ce-session-extract` again with `tail:50` when the `head:200` output appears to terminate mid-investigation (e.g., last visible turn is a tool call with no resolution, or the assistant is mid-debugging without a conclusion). If `head:200` already shows the session reaching a conclusion or running out of substantive activity, do not run a second extract — the head covers it.
 
 ### Step 5: Extract error signals (selective)
 

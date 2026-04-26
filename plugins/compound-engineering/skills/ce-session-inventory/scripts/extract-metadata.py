@@ -96,7 +96,22 @@ def get_last_timestamp(filepath, size):
     return None
 
 
-def process_file(filepath):
+def count_keyword_matches(filepath, keywords):
+    """Case-insensitive substring count for each keyword across the full file.
+
+    Returns a dict {original_keyword: count}. Reads the whole file as a single
+    string -- session JSONL files are typically a few MB; this is cheap relative
+    to the agent's prior 20 grep -l invocations and runs once per file.
+    """
+    try:
+        with open(filepath, "r", errors="replace") as f:
+            content_lower = f.read().lower()
+    except (OSError, IOError):
+        return {kw: 0 for kw in keywords}
+    return {kw: content_lower.count(kw.lower()) for kw in keywords}
+
+
+def process_file(filepath, keywords=None):
     try:
         size = os.path.getsize(filepath)
         with open(filepath, "r") as f:
@@ -122,6 +137,10 @@ def process_file(filepath):
                 last_ts = get_last_timestamp(filepath, size)
                 if last_ts:
                     result["last_ts"] = last_ts
+            if keywords:
+                matches = count_keyword_matches(filepath, keywords)
+                result["keyword_matches"] = matches
+                result["match_count"] = sum(matches.values())
             return result, None
         else:
             return None, filepath
@@ -129,14 +148,18 @@ def process_file(filepath):
         return None, filepath
 
 
-# Parse arguments: files and optional --cwd-filter <substring>
+# Parse arguments: files and optional --cwd-filter / --keyword
 files = []
 cwd_filter = None
+keywords = None
 args = sys.argv[1:]
 i = 0
 while i < len(args):
     if args[i] == "--cwd-filter" and i + 1 < len(args):
         cwd_filter = args[i + 1]
+        i += 2
+    elif args[i] == "--keyword" and i + 1 < len(args):
+        keywords = [k for k in args[i + 1].split(",") if k]
         i += 2
     elif not args[i].startswith("-"):
         files.append(args[i])
@@ -149,16 +172,22 @@ if files:
     processed = 0
     parse_errors = 0
     filtered = 0
+    matched = 0
     for filepath in files:
         if not filepath.endswith(".jsonl"):
             continue
-        result, error = process_file(filepath)
+        result, error = process_file(filepath, keywords=keywords)
         processed += 1
         if result:
             # Apply CWD filter: skip Codex sessions from other repos
             if cwd_filter and result.get("cwd") and cwd_filter not in result["cwd"]:
                 filtered += 1
                 continue
+            # Apply keyword filter: skip sessions with zero matches when --keyword is set
+            if keywords and result.get("match_count", 0) == 0:
+                continue
+            if keywords:
+                matched += 1
             print(json.dumps(result))
         elif error:
             parse_errors += 1
@@ -166,6 +195,8 @@ if files:
     meta = {"_meta": True, "files_processed": processed, "parse_errors": parse_errors}
     if filtered:
         meta["filtered_by_cwd"] = filtered
+    if keywords:
+        meta["files_matched"] = matched
     print(json.dumps(meta))
 else:
     # No file arguments: either single-file stdin mode or empty xargs invocation.

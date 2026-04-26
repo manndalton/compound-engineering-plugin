@@ -139,6 +139,101 @@ describe("extract-metadata", () => {
     expect(meta.files_processed).toBe(0)
     expect(meta.parse_errors).toBe(0)
   })
+
+  // --keyword mode: opt-in full-file content scan. When set, sessions with zero
+  // matches are excluded and each emitted session line carries match_count plus
+  // per-keyword counts so the caller can rank candidates without re-scanning.
+  describe("--keyword mode", () => {
+    test("filters to sessions matching a single keyword", async () => {
+      const { stdout, exitCode } = await runScript("extract-metadata.py", [
+        "--keyword",
+        "middleware",
+        path.join(FIXTURES_DIR, "claude-session.jsonl"),
+        path.join(FIXTURES_DIR, "codex-session.jsonl"),
+        path.join(FIXTURES_DIR, "cursor-session.jsonl"),
+      ])
+      expect(exitCode).toBe(0)
+      const lines = parseJsonLines(stdout)
+      const sessions = lines.filter((l) => !l._meta)
+      // All three fixtures mention middleware.
+      expect(sessions.length).toBe(3)
+      for (const session of sessions) {
+        expect(session.match_count).toBeGreaterThan(0)
+        expect(session.keyword_matches.middleware).toBeGreaterThan(0)
+      }
+    })
+
+    test("excludes sessions with zero matches and counts them in _meta", async () => {
+      const { stdout, exitCode } = await runScript("extract-metadata.py", [
+        "--keyword",
+        "no_such_token_xyz_42",
+        path.join(FIXTURES_DIR, "claude-session.jsonl"),
+        path.join(FIXTURES_DIR, "codex-session.jsonl"),
+      ])
+      expect(exitCode).toBe(0)
+      const lines = parseJsonLines(stdout)
+      const sessions = lines.filter((l) => !l._meta)
+      expect(sessions.length).toBe(0)
+      const meta = lines.find((l) => l._meta)
+      expect(meta.files_processed).toBe(2)
+      expect(meta.files_matched).toBe(0)
+    })
+
+    test("supports multiple comma-separated keywords with OR semantics", async () => {
+      const { stdout, exitCode } = await runScript("extract-metadata.py", [
+        "--keyword",
+        "auth,no_such_token_xyz_42",
+        path.join(FIXTURES_DIR, "claude-session.jsonl"),
+      ])
+      expect(exitCode).toBe(0)
+      const lines = parseJsonLines(stdout)
+      const sessions = lines.filter((l) => !l._meta)
+      expect(sessions.length).toBe(1)
+      expect(sessions[0].keyword_matches.auth).toBeGreaterThan(0)
+      expect(sessions[0].keyword_matches.no_such_token_xyz_42).toBe(0)
+    })
+
+    test("keyword match is case-insensitive", async () => {
+      const { stdout, exitCode } = await runScript("extract-metadata.py", [
+        "--keyword",
+        "AUTH",
+        path.join(FIXTURES_DIR, "claude-session.jsonl"),
+      ])
+      expect(exitCode).toBe(0)
+      const lines = parseJsonLines(stdout)
+      const sessions = lines.filter((l) => !l._meta)
+      expect(sessions.length).toBe(1)
+      expect(sessions[0].keyword_matches.AUTH).toBeGreaterThan(0)
+    })
+
+    test("emits files_matched in _meta and preserves files_processed", async () => {
+      const { stdout, exitCode } = await runScript("extract-metadata.py", [
+        "--keyword",
+        "middleware",
+        path.join(FIXTURES_DIR, "claude-session.jsonl"),
+        path.join(FIXTURES_DIR, "codex-session.jsonl"),
+      ])
+      expect(exitCode).toBe(0)
+      const lines = parseJsonLines(stdout)
+      const meta = lines.find((l) => l._meta)
+      expect(meta.files_processed).toBe(2)
+      expect(meta.files_matched).toBe(2)
+      expect(meta.parse_errors).toBe(0)
+    })
+
+    test("without --keyword, output shape is unchanged (no match_count field)", async () => {
+      const { stdout, exitCode } = await runScript("extract-metadata.py", [
+        path.join(FIXTURES_DIR, "claude-session.jsonl"),
+      ])
+      expect(exitCode).toBe(0)
+      const lines = parseJsonLines(stdout)
+      const session = lines.find((l) => !l._meta)
+      expect(session.match_count).toBeUndefined()
+      expect(session.keyword_matches).toBeUndefined()
+      const meta = lines.find((l) => l._meta)
+      expect(meta.files_matched).toBeUndefined()
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
