@@ -52,7 +52,7 @@ Example of a schema-valid finding (all required fields, correct enum values, cor
   "why_it_matters": "The plan acknowledges both deploy orderings produce incorrect state but resolves neither, leaving implementers with no safe deploy recipe.",
   "finding_type": "omission",
   "autofix_class": "gated_auto",
-  "suggested_fix": "Require Units 1-4 to land in a single atomic PR, or define the sequence explicitly.",
+  "suggested_fix": "Require Units 1-4 to land in a single atomic PR.",
   "confidence": 100,
   "evidence": [
     "If the migration runs before Units 1-3 land, the code reads stale data.",
