@@ -65,7 +65,7 @@ Use the current branch and existing PR check from context. If the current branch
 
 ### DU-3: Write and apply the updated description
 
-Resolve the PR's commit range, diff, and current body following Step Pre-A in `references/pr-description-writing.md`, in PR mode using the existing PR's URL from DU-2. Then compose the title and body following Steps A through H of the same reference. If the user provided focus (e.g., "include the benchmarking results"), apply it as steering — do not let it override the writing principles or fabricate content the diff does not support.
+**Read `references/pr-description-writing.md` once now** — DU-3 walks through Pre-A then Steps A through H without re-reading. Run Pre-A in PR mode using the existing PR's URL from DU-2 (it resolves the commit range, diff, and current body). Then continue with Steps A through H from the already-loaded reference to compose the title and body. If the user provided focus (e.g., "include the benchmarking results"), apply it as steering — do not let it override the writing principles or fabricate content the diff does not support.
 
 **Evidence decision:** the writing reference preserves any existing `## Demo` or `## Screenshots` block from the current body by default. If the user's focus asks to refresh or remove evidence, honor that. If no evidence block exists and one would benefit the reader, invoke `ce-demo-reel` separately to capture, then re-compose with the captured URL/path spliced in.
 
@@ -156,7 +156,9 @@ git push -u origin HEAD
 
 The working-tree diff from Step 1 only shows uncommitted changes at invocation time. The PR description must cover **all commits** in the PR.
 
-**Resolve the commit range and diff.** Follow Step Pre-A in `references/pr-description-writing.md` (current-branch mode by default; PR mode if a PR ref was passed in from description-only mode). Pre-A handles base detection, in-repo SHA fetching with the `refs/pull/N/head` fallback, and the API-only fallback for fork-PRs and any local-git failure. Use Pre-A's commit list and diff (not Step 1's working-tree diff or `git log -10`) for both the evidence decision below and the writing reference.
+**Read `references/pr-description-writing.md` once now** — Step 6 walks through it in order (Pre-A through H) with one interruption (the evidence decision below). Do not re-read the file later; refer to it by step letter.
+
+**Resolve the commit range and diff.** Run Step Pre-A from the reference (current-branch mode by default; PR mode if a PR ref was passed in from description-only mode). Pre-A handles base detection, in-repo SHA fetching with the `refs/pull/N/head` fallback, and the API-only fallback for fork-PRs and any local-git failure. Use Pre-A's commit list and diff (not Step 1's working-tree diff or `git log -10`) for both the evidence decision below and the rest of the reference.
 
 **Evidence decision (before composition).** Before running the full decision, two short-circuits:
 
@@ -172,7 +174,7 @@ Otherwise, run the full decision: if the branch diff changes observable behavior
 
 When evidence is not possible (docs-only, markdown-only, changelog-only, release metadata, CI/config-only, test-only, or pure internal refactors), skip without asking.
 
-**Compose the title and body.** Continue with Steps A through H of `references/pr-description-writing.md` (commit classification, evidence handling, narrative framing, sizing, writing voice and principles, visual communication, title format, body assembly, the Compound Engineering badge, and the compression pass). For an existing PR, the current body was already read in Pre-A.
+**Compose the title and body.** Continue with Steps A through H from the already-loaded reference (commit classification, evidence handling, narrative framing, sizing, writing voice and principles, visual communication, title format, body assembly, the Compound Engineering badge, and the compression pass). For an existing PR, the current body was already read in Pre-A.
 
 ### Step 7: Create or update the PR
 
