@@ -13,9 +13,7 @@ Go from working changes to an open pull request, rewrite an existing PR descript
 
 Three flavors of intent. Pick one and follow the matching path; otherwise default to the full workflow.
 
-- **Description-only generation.** If the user asked for *just* a PR description with no commit or push intent (e.g., "write a PR description", "draft a PR description for this branch", "describe this PR", or pasted a PR URL/number alone), skip Steps 4–5 entirely AND skip Step 1's decision tree. Use the data already gathered in the Context section above (status, branch, log, default branch, PR check) — do NOT run Step 1's stop gates, which are full-workflow only and would terminate this path on common cases like "feature branch, all pushed, open PR → stop". Then go to Step 6 to compose the title and body following `references/pr-description-writing.md`. Print the result back to the user. Apply via `gh pr edit`/`gh pr create` only if the user asks.
-
-  **If the user pasted a PR URL or number** (e.g., `https://github.com/owner/repo/pull/561`, `#561`, `pr:561`, or a bare `561`), thread that ref through every PR-scoped command in Step 6 — pass it as the positional argument to `gh pr view <ref> --json baseRefName,headRefOid,body,headRefName,url` instead of the bare branch-local `gh pr view`. Then resolve `<base-remote>` by parsing `owner/repo` from the returned `url` and matching against `git remote -v` (same as DU-3's logic). Use `<base-remote>/<baseRefName>` and `<headRefOid>` for the diff base AND the commit list (`git fetch <base-remote> <baseRefName> <headRefOid>`, then `git log --oneline $(git merge-base <base-remote>/<baseRefName> <headRefOid>)..<headRefOid>` and `git diff <base-remote>/<baseRefName>...<headRefOid>`), not `HEAD` against the local branch's base. **Do not hardcode `origin`** — for fork-based PRs and cross-repo PRs alike, `origin` is the wrong base. If no local remote matches the PR's base repo, fall back to `gh pr diff <ref>` and `gh pr view <ref> --json commits --jq '.commits[] | [.oid[0:7], .messageHeadline] | @tsv'`. Without this substitution, "describe PR #123" silently describes the current branch.
+- **Description-only generation.** If the user asked for *just* a PR description with no commit or push intent (e.g., "write a PR description", "draft a PR description for this branch", "describe this PR", or pasted a PR URL/number alone), skip Steps 4–5 AND Step 1's decision tree (its stop gates are full-workflow only and would terminate common cases like "feature branch, all pushed, open PR → stop"). Use the data from the Context section above instead. Then go to Step 6 to compose. If the user pasted a PR URL/number, pass it to Step 6 as the PR ref so Pre-A resolves the right commit range (otherwise Pre-A defaults to current-branch mode). Print the result back to the user; apply via `gh pr edit`/`gh pr create` only if the user asks.
 - **Description update on existing PR.** If the user is asking to update, refresh, or rewrite an existing PR description (with no mention of committing or pushing), follow the Description Update workflow below. The user may also provide a focus (e.g., "update the PR description and add the benchmarking results"). Note any focus for DU-3.
 - **Full workflow.** Otherwise, follow the Full workflow below.
 
@@ -67,26 +65,7 @@ Use the current branch and existing PR check from context. If the current branch
 
 ### DU-3: Write and apply the updated description
 
-Gather what the writing reference needs before composing — the current PR body (to preserve any existing evidence block and drive the compare-and-confirm step) AND the full branch diff (to drive composition itself).
-
-Read the body, base branch, and PR URL (the URL identifies the base repo, which may not be `origin` for fork-based PRs):
-
-```bash
-gh pr view --json body,baseRefName,url --jq '{body: .body, baseRefName: .baseRefName, url: .url}'
-```
-
-Then resolve the base remote: parse `owner/repo` out of the PR URL and match it against `git remote -v` fetch URLs (handle both `git@github.com:owner/repo` and `https://github.com/owner/repo` forms; strip `.git` suffix). The matching remote name is `<base-remote>`. **Do not hardcode `origin`** — for fork-based PRs (`origin` is your fork, PR targets upstream), `origin/<baseRefName>` is the wrong base.
-
-Gather the full branch diff AND commit list using the same logic as Step 6's "Gather the full branch diff and commit list" subsection, against `<base-remote>/<baseRefName>` rather than `origin/<baseRefName>`. The writing reference assumes both are already in context — without this, composition runs from stale or empty context, and Step A's commit classification falls back to the wrong (HEAD-anchored, capped-at-10) `git log` from the Context section.
-
-**Fork-PR fallback.** If no local remote matches the PR URL's base repo, fall back to the GitHub API for both diff and commits — `origin` would diff against the wrong base:
-
-```bash
-gh pr diff
-gh pr view --json commits --jq '.commits[] | [.oid[0:7], .messageHeadline] | @tsv'
-```
-
-Compose the new title and body following `references/pr-description-writing.md`. If the user provided focus (e.g., "include the benchmarking results"), apply it as steering — do not let it override the writing principles or fabricate content the diff does not support.
+Resolve the PR's commit range, diff, and current body following Step Pre-A in `references/pr-description-writing.md`, in PR mode using the existing PR's URL from DU-2. Then compose the title and body following Steps A through H of the same reference. If the user provided focus (e.g., "include the benchmarking results"), apply it as steering — do not let it override the writing principles or fabricate content the diff does not support.
 
 **Evidence decision:** the writing reference preserves any existing `## Demo` or `## Screenshots` block from the current body by default. If the user's focus asks to refresh or remove evidence, honor that. If no evidence block exists and one would benefit the reader, invoke `ce-demo-reel` separately to capture, then re-compose with the captured URL/path spliced in.
 
@@ -177,38 +156,7 @@ git push -u origin HEAD
 
 The working-tree diff from Step 1 only shows uncommitted changes at invocation time. The PR description must cover **all commits** in the PR.
 
-**Detect the base branch and remote.** Resolve both the base branch and the remote (fork-based PRs may use a remote other than `origin`). Stop at the first that succeeds:
-
-1. **PR metadata** (if existing PR found in Step 3):
-   ```bash
-   gh pr view --json baseRefName,url
-   ```
-   Extract `baseRefName`. Match `owner/repo` from the PR URL against `git remote -v` fetch URLs to find the base remote. **If no remote matches** (fork-based PR with no `upstream` remote configured), do NOT fall back to `origin` — `origin` is the contributor fork and would diff against the wrong base. Instead, skip the local-git path entirely for this invocation: use `gh pr diff` for the diff and `gh pr view --json commits` for the commit list, then proceed to composition. Note in the user-facing output that the API path was used.
-2. **Remote default branch from context** -- if resolved, strip `origin/` prefix. Use `origin`.
-3. **GitHub metadata:**
-   ```bash
-   gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
-   ```
-   Use `origin`.
-4. **Common names** -- check `main`, `master`, `develop`, `trunk` in order:
-   ```bash
-   git rev-parse --verify origin/<candidate>
-   ```
-   Use `origin`.
-
-If none resolve, ask the user to specify the target branch.
-
-**Gather the full branch diff and commit list (before evidence decision).** The working-tree diff from Step 1 only reflects uncommitted changes at invocation time — on the common "feature branch, all pushed, open PR" path, Step 1 skips the commit/push steps and the working-tree diff is empty. The recent-commits log from Step 1 (`git log --oneline -10`) is also wrong for sizing the description: it's HEAD-anchored, not range-anchored, so it bleeds in pre-branch commits on long branches and misses post-`-10` commits on very long ones. Compute both the diff and the commit list explicitly against the base resolved above, anchored at the merge base. Only fetch when the local ref isn't available — if `<base-remote>/<base-branch>` already resolves locally, run from local state so offline / restricted-network / expired-auth environments don't hard-fail:
-
-```bash
-git rev-parse --verify <base-remote>/<base-branch> >/dev/null 2>&1 \
-  || git fetch --no-tags <base-remote> <base-branch>
-MERGE_BASE=$(git merge-base "<base-remote>/<base-branch>" HEAD) \
-  && echo '=== COMMITS ===' && git log --oneline "$MERGE_BASE..HEAD" \
-  && echo '=== DIFF ===' && git diff "$MERGE_BASE...HEAD"
-```
-
-Use this branch diff and commit list (not Step 1's working-tree diff or `git log -10`) for both the evidence decision and the writing reference. If the commit list is empty (e.g., HEAD is already merged into the base or the branch has no unique commits), skip the evidence prompt and continue to composition.
+**Resolve the commit range and diff.** Follow Step Pre-A in `references/pr-description-writing.md` (current-branch mode by default; PR mode if a PR ref was passed in from description-only mode). Pre-A handles base detection, in-repo SHA fetching with the `refs/pull/N/head` fallback, and the API-only fallback for fork-PRs and any local-git failure. Use Pre-A's commit list and diff (not Step 1's working-tree diff or `git log -10`) for both the evidence decision below and the writing reference.
 
 **Evidence decision (before composition).** Before running the full decision, two short-circuits:
 
@@ -224,11 +172,7 @@ Otherwise, run the full decision: if the branch diff changes observable behavior
 
 When evidence is not possible (docs-only, markdown-only, changelog-only, release metadata, CI/config-only, test-only, or pure internal refactors), skip without asking.
 
-**Compose the title and body.** Read `references/pr-description-writing.md` and follow Steps A through H. The reference covers commit classification, evidence handling, narrative framing, sizing, writing voice and principles, visual communication, title format, body assembly, the Compound Engineering badge, and the compression pass.
-
-For an existing PR, also read its current body (`gh pr view --json body --jq '.body'`) so the reference's evidence-preservation rule has the source material it needs.
-
-If the commit list is empty (e.g., HEAD is already merged into the base or the branch has no unique commits), report "No commits to describe" and stop — do not invent a description.
+**Compose the title and body.** Continue with Steps A through H of `references/pr-description-writing.md` (commit classification, evidence handling, narrative framing, sizing, writing voice and principles, visual communication, title format, body assembly, the Compound Engineering badge, and the compression pass). For an existing PR, the current body was already read in Pre-A.
 
 ### Step 7: Create or update the PR
 

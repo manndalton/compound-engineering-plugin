@@ -1,8 +1,82 @@
 # PR Description Writing
 
-How to compose a PR title and body once the diff and commit list are known. Loaded on demand by `ce-commit-push-pr` Step 6 — do not load earlier.
+How to resolve the right commit range and compose a PR title and body. Loaded on demand by `ce-commit-push-pr` callers — do not load earlier.
 
-The caller has already resolved the diff, the commit list, and (for existing PRs) the current PR body. This file covers everything from commit classification through the final composed body.
+Step Pre-A resolves the commit range, diff, and (for existing PRs) the current PR body. Steps A through H assume Pre-A's outputs are in context.
+
+---
+
+## Step Pre-A: Resolve the PR commit range and diff
+
+Determine which commits and diff the description should cover. Run this first; Steps A and beyond assume the commit list and full diff are in context.
+
+### Mode
+
+- **Current-branch mode.** Describe HEAD vs the repo's default base. Used when the caller has no explicit PR reference (Step 6 of ce-commit-push-pr's full workflow; description-only mode without a PR ref).
+- **PR mode.** Describe a specific PR's commit range. Used by DU-3 (the existing PR on the current branch) and description-only mode (the user pasted a PR URL/number). The PR ref may be a bare number, `#NN`, `pr:NN`, or a full URL — the caller passes it to `gh pr view <ref>` directly. (`gh pr view` accepts numbers and URLs natively; `#NN` and `pr:NN` need the `#` or `pr:` stripped before passing.)
+
+### Resolve PR metadata (PR mode and current-branch-with-existing-PR)
+
+```bash
+gh pr view [<ref>] --json baseRefName,headRefOid,baseRefOid,headRepository,headRepositoryOwner,isCrossRepository,url,body,state
+```
+
+If the returned `state` is not `OPEN`, report `"PR <number> is <state>; cannot generate description"` and exit gracefully — do not invent a description.
+
+### Detect the base branch and remote
+
+For PR mode (or current-branch mode with an existing PR), use `baseRefName` from the metadata above. For current-branch mode without an existing PR, resolve in priority order:
+
+1. **Caller-supplied base** (if the caller passed `base:<ref>`) — use verbatim. The ref must resolve locally.
+2. **Repo default branch** — `git rev-parse --abbrev-ref origin/HEAD`, strip `origin/` prefix.
+3. **GitHub metadata** — `gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'`.
+4. **Common names** — try `main`, `master`, `develop`, `trunk` in order via `git rev-parse --verify origin/<candidate>`.
+
+If none resolve, ask the user to specify the base branch.
+
+For the **base remote**, parse `owner/repo` from the PR URL (or use the repo of the current checkout in current-branch mode without a PR) and match against `git remote -v` fetch URLs (handle both `git@github.com:owner/repo` and `https://github.com/owner/repo` forms; strip `.git`). The matching remote name is `<base-remote>`. **If no remote matches** (fork-based PR with no `upstream` remote), do NOT default to `origin` — `origin` would diff against the wrong base. Skip directly to Case B.
+
+### Case A — base remote matched, attempt local git
+
+```bash
+PR_HEAD_SHA=<headRefOid>   # for current-branch mode, use HEAD instead
+git fetch --no-tags <base-remote> <baseRefName> $PR_HEAD_SHA
+MERGE_BASE=$(git merge-base <base-remote>/<baseRefName> $PR_HEAD_SHA) \
+  && echo '=== COMMITS ===' && git log --oneline "$MERGE_BASE..$PR_HEAD_SHA" \
+  && echo '=== DIFF ===' && git diff "$MERGE_BASE...$PR_HEAD_SHA"
+```
+
+The fetch is idempotent when refs are already local. Using the explicit `$PR_HEAD_SHA` in downstream commands avoids `FETCH_HEAD`'s multi-ref ordering problem.
+
+### Case A inner fallback — SHA fetch rejected
+
+Some GHES configurations disallow fetching non-tip SHAs. If the SHA fetch is rejected (PR mode only — current-branch mode uses HEAD which is always local), fall back to fetching the PR head via `refs/pull/<number>/head`:
+
+```bash
+git fetch --no-tags <base-remote> "refs/pull/<number>/head"
+PR_HEAD_SHA=$(awk '/refs\/pull\/[0-9]+\/head/ {print $1; exit}' "$(git rev-parse --git-dir)/FETCH_HEAD")
+```
+
+Then re-run the merge-base + log + diff with the new `$PR_HEAD_SHA`.
+
+### Case B — API only
+
+Use Case B when:
+- No local remote matches the PR's base repo (fork-PR, cross-repo PR), OR
+- Case A's fetches all fail (offline, restricted network, expired auth, GHES quirks blocking both SHA and `refs/pull/N/head`).
+
+Skip local git entirely:
+
+```bash
+gh pr diff <ref>
+gh pr view <ref> --json commits --jq '.commits[] | [.oid[0:7], .messageHeadline] | @tsv'
+```
+
+Note in the user-facing output that the API fallback was used.
+
+### Empty range
+
+If the resulting commit list is empty (HEAD already merged into the base, or the branch has no unique commits), report `"No commits to describe"` and exit gracefully — do not invent a description.
 
 ---
 
