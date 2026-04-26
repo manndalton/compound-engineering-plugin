@@ -53,23 +53,33 @@ def main(argv: list[str]) -> int:
 
     issues: list[str] = []
 
-    # Check 1: frontmatter delimiters
-    if not text.startswith("---\n"):
+    # Check 1: frontmatter delimiters. Match the delimiter as a complete
+    # line whose stripped content is exactly `---` — substring matching
+    # (e.g. `text.find("\n---", 4)`) would falsely accept `----` or
+    # `---extra` as a terminator and let malformed docs slip through to
+    # downstream parsers that require a strict `---` line.
+    lines = text.split("\n")
+    if not lines or lines[0].rstrip() != "---":
         sys.stderr.write(
             f"FAIL: {doc_path}\n"
-            f"  file does not start with '---' frontmatter delimiter\n"
+            f"  file does not start with '---' frontmatter delimiter line\n"
         )
         return 1
 
-    end = text.find("\n---", 4)
-    if end < 0:
+    end_idx: int | None = None
+    for i in range(1, len(lines)):
+        if lines[i].rstrip() == "---":
+            end_idx = i
+            break
+
+    if end_idx is None:
         sys.stderr.write(
             f"FAIL: {doc_path}\n"
-            f"  frontmatter not closed (missing terminating '---')\n"
+            f"  frontmatter not closed (no '---' line after the opening delimiter)\n"
         )
         return 1
 
-    fm_text = text[4:end]
+    fm_text = "\n".join(lines[1:end_idx])
 
     # Checks 2, 3, 4: scalar quoting risks on top-level scalar fields.
     # We scan line-by-line and only flag top-level mapping entries

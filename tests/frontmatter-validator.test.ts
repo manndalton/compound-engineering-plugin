@@ -183,6 +183,61 @@ Body without closing delimiter.
         expect(result.stderr).toContain("not closed")
       })
 
+      test("rejects '----' as closing delimiter (must match line exactly, not substring)", () => {
+        // text.find("\\n---", 4) would falsely accept '----'; line-anchored
+        // matching rejects it. Strict frontmatter parsers downstream require
+        // an exact '---' line, so this is a real bug to catch.
+        const docPath = writeTempDoc(`---
+title: "Sample"
+date: 2026-04-25
+module: ce-compound
+problem_type: best_practice
+component: tooling
+severity: low
+----
+
+Body.
+`)
+        const result = runValidator(skillDir, docPath)
+        expect(result.code).toBe(1)
+        expect(result.stderr).toContain("not closed")
+      })
+
+      test("rejects '---extra' as closing delimiter", () => {
+        const docPath = writeTempDoc(`---
+title: "Sample"
+date: 2026-04-25
+module: ce-compound
+problem_type: best_practice
+component: tooling
+severity: low
+---extra
+
+Body.
+`)
+        const result = runValidator(skillDir, docPath)
+        expect(result.code).toBe(1)
+        expect(result.stderr).toContain("not closed")
+      })
+
+      test("accepts '---' delimiter with trailing whitespace", () => {
+        // Permissive on whitespace (rstrip the line) but strict on content.
+        const docPath = writeTempDoc(
+          "---   \n" +
+            'title: "Sample"\n' +
+            "date: 2026-04-25\n" +
+            "module: ce-compound\n" +
+            "problem_type: best_practice\n" +
+            "component: tooling\n" +
+            "severity: low\n" +
+            "---  \n" +
+            "\n" +
+            "Body.\n",
+        )
+        const result = runValidator(skillDir, docPath)
+        expect(result.code).toBe(0)
+      })
+
       test("exits 2 (usage error) on missing file", () => {
         const result = runValidator(skillDir, "/tmp/this-file-does-not-exist-fm.md")
         expect(result.code).toBe(2)
