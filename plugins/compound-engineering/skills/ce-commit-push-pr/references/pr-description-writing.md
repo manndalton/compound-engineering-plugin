@@ -38,15 +38,24 @@ For the **base remote**, parse `owner/repo` from the PR URL (or use the repo of 
 
 ### Case A — base remote matched, attempt local git
 
+**Only fetch when the refs aren't already local.** Skipping the fetch when refs resolve locally preserves offline / restricted-network / expired-auth workability — a common case when re-running the skill on a branch that's already been fetched recently.
+
 ```bash
 PR_HEAD_SHA=<headRefOid>   # for current-branch mode, use HEAD instead
-git fetch --no-tags <base-remote> <baseRefName> $PR_HEAD_SHA
+
+if ! git rev-parse --verify <base-remote>/<baseRefName> >/dev/null 2>&1 \
+  || ! git rev-parse --verify $PR_HEAD_SHA >/dev/null 2>&1; then
+  git fetch --no-tags <base-remote> <baseRefName> $PR_HEAD_SHA
+fi
+
 MERGE_BASE=$(git merge-base <base-remote>/<baseRefName> $PR_HEAD_SHA) \
   && echo '=== COMMITS ===' && git log --oneline "$MERGE_BASE..$PR_HEAD_SHA" \
   && echo '=== DIFF ===' && git diff "$MERGE_BASE...$PR_HEAD_SHA"
 ```
 
-The fetch is idempotent when refs are already local. Using the explicit `$PR_HEAD_SHA` in downstream commands avoids `FETCH_HEAD`'s multi-ref ordering problem.
+For current-branch mode, `$PR_HEAD_SHA` is `HEAD` which is always local, so only the base ref needs fetching. Using the explicit `$PR_HEAD_SHA` in downstream commands avoids `FETCH_HEAD`'s multi-ref ordering problem.
+
+If `git merge-base` itself fails (shallow clone with insufficient history, or genuinely unrelated histories), do not press on — fall through to Case B and let the API path produce the diff and commits.
 
 ### Case A inner fallback — SHA fetch rejected
 
