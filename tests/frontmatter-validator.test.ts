@@ -225,16 +225,4 @@ Body.
     const bContent = readFileSync(scriptPath(b), "utf8")
     expect(aContent).toBe(bContent)
   })
-
-  test("bash wrapper content is identical across skill copies", () => {
-    const aWrapper = readFileSync(
-      path.join(SKILL_DIRS[0], "scripts/validate-frontmatter"),
-      "utf8",
-    )
-    const bWrapper = readFileSync(
-      path.join(SKILL_DIRS[1], "scripts/validate-frontmatter"),
-      "utf8",
-    )
-    expect(aWrapper).toBe(bWrapper)
-  })
 })

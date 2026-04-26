@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# Thin wrapper so SKILL.md can call `bash scripts/validate-frontmatter <doc>`
-# without having to know about Python or path resolution.
-set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_DIR/validate-frontmatter.py" "$@"

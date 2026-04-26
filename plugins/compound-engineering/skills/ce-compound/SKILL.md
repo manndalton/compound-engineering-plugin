@@ -219,7 +219,7 @@ The orchestrating agent (main conversation) performs these steps:
 5. Validate YAML frontmatter against `references/schema.yaml`, including the YAML-safety quoting rule for array items (see `references/yaml-schema.md` > YAML Safety Rules)
 6. Create directory if needed: `mkdir -p docs/solutions/[category]/`
 7. Write the file: either the updated existing doc or the new `docs/solutions/[category]/[filename].md`
-8. **Run `bash scripts/validate-frontmatter <output-path>`** to catch parser-safety issues that the prose rules miss (silent comment truncation from unquoted ` #`, mapping confusion from unquoted `: `, leading reserved indicators). Exit 0 means the doc is parser-safe. On exit 1, the script's stderr names the offending field(s) and what to fix — quote the value(s) and re-write the doc, then re-run until exit 0. Do not declare success while validation fails. The script uses only Python 3 stdlib (no PyYAML or other deps).
+8. **Run `python3 scripts/validate-frontmatter.py <output-path>`** to catch parser-safety issues that the prose rules miss (silent comment truncation from unquoted ` #`, mapping confusion from unquoted `: `, leading reserved indicators). Exit 0 means the doc is parser-safe. On exit 1, the script's stderr names the offending field(s) and what to fix — quote the value(s) and re-write the doc, then re-run until exit 0. Do not declare success while validation fails. The script uses only Python 3 stdlib (no PyYAML or other deps).
 
 When creating a new doc, preserve the section order from `assets/resolution-template.md` unless the user explicitly asks for a different structure.
 
