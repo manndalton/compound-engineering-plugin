@@ -325,9 +325,12 @@ def _stitch_frames(output, frames, duration=3.0, min_frame_bytes=DEFAULT_MIN_FRA
             if size < min_frame_bytes:
                 die(
                     f"Frame {f} is {size} bytes, below the {min_frame_bytes}-byte minimum. "
-                    f"This usually means the page had not finished loading when the screenshot was taken. "
-                    f"Re-capture after `agent-browser wait --load networkidle`, or pass --min-frame-bytes "
-                    f"to lower the threshold if the small frame is intentional."
+                    f"PNG size is dominated by entropy, so this is usually -- but not always -- "
+                    f"a page that had not finished loading when the screenshot was taken. "
+                    f"If the page is genuinely loaded but compresses small (flat-color UI, "
+                    f"sparse empty state, small viewport), pass --min-frame-bytes 0 to disable "
+                    f"the check, or a smaller positive value to lower the threshold. "
+                    f"Otherwise, re-capture after `agent-browser wait --load networkidle`."
                 )
 
     if not check_tool("ffmpeg"):
