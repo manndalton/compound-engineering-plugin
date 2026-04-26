@@ -141,7 +141,11 @@ Determine how to proceed based on what was provided in `<input_document>`.
    2. Check for intersection — any file path appearing in 2+ units means overlap
    3. If any overlap is found, downgrade to serial subagents. Log the reason (e.g., "Units 2 and 4 share `config/routes.rb` — using serial dispatch"). Serial subagents still provide context-window isolation without shared-directory risks
 
-   Even with no file overlap, parallel subagents sharing a working directory face git index contention (concurrent staging/committing corrupts the index) and test interference (concurrent test runs pick up each other's in-progress changes). The parallel subagent constraints below mitigate these.
+   Even with no file overlap, parallel subagents sharing the orchestrator's working directory face git index contention (concurrent staging/committing corrupts the index) and test interference (concurrent test runs pick up each other's in-progress changes). Worktree isolation eliminates both; the shared-directory fallback constraints below mitigate them.
+
+   **Subagent isolation** — give each parallel subagent its own working tree:
+   - **Claude Code (`Agent` tool):** pass `isolation: "worktree"` and `run_in_background: true`. The harness creates a per-subagent worktree under `.claude/worktrees/agent-<id>` on its own branch. Verify `.claude/worktrees/` is gitignored before relying on this.
+   - **Other platforms** without built-in worktree isolation (e.g., Codex `spawn_agent`, Pi `subagent`): subagents share the orchestrator's directory.
 
    **Subagent dispatch** uses your available subagent or task spawning mechanism. For each unit, give the subagent:
    - The full plan file path (for overall context)
@@ -149,9 +153,10 @@ Determine how to proceed based on what was provided in `<input_document>`.
    - Any resolved deferred questions relevant to that unit
    - Instruction to check whether the unit's test scenarios cover all applicable categories (happy paths, edge cases, error paths, integration) and supplement gaps before writing tests
 
-   **Parallel subagent constraints** — when dispatching units in parallel (not serial or inline):
+   **Shared-directory fallback constraints** — apply only when worktree isolation is unavailable:
    - Instruct each subagent: "Do not stage files (`git add`), create commits, or run the project test suite. The orchestrator handles testing, staging, and committing after all parallel units complete."
-   - These constraints prevent git index contention and test interference between concurrent subagents
+   - These constraints prevent git index contention and test interference between concurrent subagents.
+   - With worktree isolation active, omit these constraints — subagents may stage, commit, and run their unit's tests within their own worktree branch.
 
    **Permission mode:** Omit the `mode` parameter when dispatching subagents so the user's configured permission settings apply. Do not pass `mode: "auto"` — it overrides user-level settings like `bypassPermissions`.
 
@@ -162,7 +167,16 @@ Determine how to proceed based on what was provided in `<input_document>`.
    4. Update the task list (do not edit the plan body — progress is carried by the commit)
    5. Dispatch the next unit
 
-   **After all parallel subagents in a batch complete:**
+   **After all parallel subagents in a batch complete (worktree-isolated mode):**
+   1. Wait for every subagent in the current parallel batch to finish.
+   2. For each completed subagent, in dependency order: review the worktree's diff against the orchestrator's branch. If the subagent did not commit its own work, stage and commit it inside that worktree.
+   3. Merge each subagent's branch into the orchestrator's branch sequentially in dependency order. Resolve conflicts at merge time — file overlap the Parallel Safety Check did not predict surfaces here, not as silent data loss.
+   4. After each merge, run the relevant test suite. If tests fail, diagnose and fix before merging the next branch.
+   5. Update the task list (progress is carried by the merge commits).
+   6. Remove each merged worktree (`git worktree remove .claude/worktrees/agent-<id>`).
+   7. Dispatch the next batch of independent units, or the next dependent unit.
+
+   **After all parallel subagents in a batch complete (shared-directory fallback):**
    1. Wait for every subagent in the current parallel batch to finish before acting on any of their results
    2. Cross-check for discovered file collisions: compare the actual files modified by all subagents in the batch (not just their declared `Files:` lists). Subagents may create or modify files not anticipated during planning — this is expected, since plans describe *what* not *how*. A collision only matters when 2+ subagents in the same batch modified the same file. In a shared working directory, only the last writer's version survives — the other unit's changes to that file are lost. If a collision is detected: commit all non-colliding files from all units first, then re-run the affected units serially for the shared file so each builds on the other's committed work
    3. For each completed unit, in dependency order: review the diff, run the relevant test suite, stage only that unit's files, and commit with a conventional message derived from the unit's Goal
