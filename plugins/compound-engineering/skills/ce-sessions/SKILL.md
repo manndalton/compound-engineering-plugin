@@ -16,7 +16,7 @@ Search your session history.
 
 ## Pre-resolved context
 
-**Repo name (pre-resolved):** !`basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")"`
+**Repo name (pre-resolved):** !`common=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && [ -n "$common" ] && basename "$(dirname "$common")"`
 
 **Git branch (pre-resolved):** !`git rev-parse --abbrev-ref HEAD 2>/dev/null`
 
