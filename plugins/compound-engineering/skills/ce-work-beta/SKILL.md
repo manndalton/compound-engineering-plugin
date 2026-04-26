@@ -228,7 +228,7 @@ Determine how to proceed based on what was provided in `<input_document>`.
    3. Merge each subagent's branch into the orchestrator's branch sequentially in dependency order. Resolve conflicts at merge time — file overlap the Parallel Safety Check did not predict surfaces here, not as silent data loss.
    4. After each merge, run the relevant test suite. If tests fail, diagnose and fix before merging the next branch.
    5. Update the task list (progress is carried by the merge commits).
-   6. Remove each merged worktree (`git worktree remove .claude/worktrees/agent-<id>`).
+   6. Remove each merged worktree using the absolute path returned in the subagent's result (`git worktree remove <absolute-path>`). If the platform's subagent primitive does not return a path, build one with `git rev-parse --show-toplevel` (e.g., `git worktree remove "$(git rev-parse --show-toplevel)/.claude/worktrees/agent-<id>"`) so cleanup works regardless of the orchestrator's CWD.
    7. Dispatch the next batch of independent units, or the next dependent unit.
 
    **After all parallel subagents in a batch complete (shared-directory fallback):**
@@ -328,7 +328,11 @@ Determine how to proceed based on what was provided in `<input_document>`.
 
    **Note:** Incremental commits use clean conventional messages without attribution footers. The final Phase 4 commit/PR includes the full attribution.
 
-   **Parallel subagent mode:** When units run as parallel subagents, the subagents do not commit — the orchestrator handles staging and committing after the entire parallel batch completes (see Parallel subagent constraints in Phase 1 Step 4). The commit guidance in this section applies to inline and serial execution, and to the orchestrator's commit decisions after parallel batch completion.
+   **Parallel subagent mode:** Commit ownership is split by isolation mode (see Phase 1 Step 4):
+   - **Worktree-isolated:** subagents may stage and commit inside their own worktree branch; the orchestrator merges those branches in dependency order after the batch.
+   - **Shared-directory fallback:** subagents do not commit; the orchestrator stages and commits each unit after the entire parallel batch completes.
+
+   The commit guidance in this section applies to inline and serial execution, to subagents in worktree-isolated mode, and to the orchestrator's post-batch commits in shared-directory mode.
 
 3. **Follow Existing Patterns**
 
