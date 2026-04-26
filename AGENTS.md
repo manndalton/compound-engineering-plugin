@@ -84,6 +84,18 @@ cat .claude-plugin/marketplace.json | jq .
 cat plugins/compound-engineering/.claude-plugin/plugin.json | jq .
 ```
 
+## Validating Agent and Skill Changes
+
+Behavioral changes to a plugin agent or skill (anything under `plugins/*/agents/` or `plugins/*/skills/`) need a different validation path than mechanical code changes, because of how Claude Code loads plugins.
+
+- **Use the `skill-creator` skill to test changes.** Skill-creator is purpose-built for this: it spawns a generic subagent and injects the agent or skill content into the subagent's prompt at dispatch time, so each run reads the current source from disk. Invoke `/skill-creator` and use its eval workflow rather than reaching for ad-hoc workarounds. Eval scaffolding for repo-owned agents/skills lives under `evals/<name>/` for codified, repeatable runs.
+
+- **Plugin agent definitions cache at session start.** Once a Claude Code session is open, dispatching a typed agent (e.g., `Agent({subagent_type: "compound-engineering:ce-session-historian"})`) runs the in-memory copy that was loaded when the session began. File edits to the agent's `.agent.md` after session start do not propagate to that dispatch path within the same session. Any iteration loop built around typed-agent dispatch in the same session is testing the pre-edit definition, not your changes.
+
+- **Do NOT edit `~/.claude/plugins/cache/` or `~/.claude/plugins/marketplaces/` to try to force a reload.** Those paths are user machine state, not repo-managed. Modifying them does not reliably bypass the in-session cache (it didn't, in observed behavior), risks being silently overwritten by plugin updates, and is the wrong layer to test from. The skill-creator pattern is the proper approach; if you genuinely need fresh-loaded behavior of the typed-agent dispatch path, restart the Claude Code session — but skill-creator is preferred for fast iteration.
+
+- **Mechanical changes do not have this restriction.** Skill scripts (e.g., `extract-metadata.py`), parser logic, conversion code, and anything `bun test` exercises always run the current source. The caching issue only affects LLM-driven agent or skill prose behavior dispatched through the plugin loader.
+
 ## Coding Conventions
 
 - Prefer explicit mappings over implicit magic when converting between platforms.

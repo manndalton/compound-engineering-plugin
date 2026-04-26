@@ -22,22 +22,17 @@ Evals dispatch the target agent via the Agent tool from inside an active Claude 
 
 Each eval cleans up its own fixtures on completion. No shared global state.
 
-## Critical caveat: agent definitions load at session start
+## How to dispatch — use the `skill-creator` pattern
 
-Claude Code appears to load plugin agent definitions once at session start and hold them in memory for the duration of the session. **Edits to an agent's `.agent.md` file made after session start are not picked up by subsequent Agent-tool dispatches in that same session** — the dispatched agent runs against the in-memory copy from session start.
+**Always use the `skill-creator` skill (or its dispatch pattern) to run agent/skill evals.** Do not dispatch the typed agent (e.g., `Agent({subagent_type: "compound-engineering:ce-session-historian"})`) from inside the same session you are editing the agent in — that path runs the in-memory copy loaded at session start, not your edits.
 
-Practical consequences:
+Skill-creator's pattern: spawn a `general-purpose` subagent and inject the agent or skill definition's full content into the subagent's prompt at dispatch time. Each run sources content from the current filesystem, so iteration works within a single session. See `session-historian/run.md` for a worked example.
 
-- Iterating on an agent definition and re-running the eval inside the same session does **not** test your edits. You will see identical behavior across iterations.
-- A test was confirmed during the development of this framework: a uniquely-identifiable marker was added to the agent definition with an instruction to echo a corresponding string in any response. After file-syncing the change to every cached path under `~/.claude/plugins/`, the dispatched agent did not echo the string — confirming it was running an in-memory copy not refreshed from disk.
+**Do NOT edit `~/.claude/plugins/cache/` or `~/.claude/plugins/marketplaces/` to try to force a reload.** Those paths are user machine state, not repo-managed; modifying them does not reliably bypass the in-session cache, can be silently overwritten by plugin updates, and is the wrong layer to test from. The skill-creator pattern sidesteps the cache without touching machine state.
 
-How to validate agent edits with this framework:
+If skill-creator is unavailable for some reason and you need to dispatch via the typed agent path, the only correct fallback is to exit and restart the Claude Code session so the new definition loads at next session boot. Prefer skill-creator over restart for fast iteration.
 
-1. Make and commit the agent edits in the repo.
-2. **Restart your Claude Code session** so the new definition loads at session start.
-3. Run the eval in the fresh session.
-
-Mechanical primitives (skill scripts like the `--keyword` mode on `extract-metadata.py`) do not have this restriction — `bun test` always runs the current source. Only LLM-driven agent behavior is affected.
+Mechanical changes (skill scripts like the `--keyword` mode on `extract-metadata.py`, parser logic, conversion code) do not have this restriction — `bun test` always runs the current source. Only LLM-driven agent or skill prose behavior is affected by the session-start cache.
 
 ## Running an eval
 

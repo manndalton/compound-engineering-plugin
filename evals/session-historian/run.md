@@ -18,11 +18,13 @@ Captures `FIXTURE_DIR` and `FAKE_REPO_NAME` from stdout. The setup script genera
 - A `gitBranch` that does **not** lexically overlap with `auth` / `middleware` / `crash` / `session` / `token`
 - User and assistant content about an unrelated topic (docs cleanup, marketing styles, snapshot tests)
 
-### 2. Dispatch the historian — use the skill-creator pattern, not the typed agent
+### 2. Dispatch the historian — use the `skill-creator` skill (or its pattern)
 
-**Critical caveat:** plugin agent definitions in Claude Code load at session start and cache in memory. **Do not dispatch via `Agent({subagent_type: "compound-engineering:ce-session-historian"})`** — that path uses the cached definition and your repo edits will not be tested. See `../README.md` ("Critical caveat: agent definitions load at session start").
+Invoke the `skill-creator` skill — it owns the correct dispatch pattern for evaluating agent and skill changes. See `../README.md` ("How to dispatch — use the skill-creator pattern") and the repo-root `AGENTS.md` ("Validating Agent and Skill Changes") for why.
 
-Use the skill-creator pattern instead: spawn a `general-purpose` subagent and inject the agent definition's full text from disk at dispatch time. Each subagent reads the latest content fresh.
+**Do not dispatch via `Agent({subagent_type: "compound-engineering:ce-session-historian"})`** — that path uses the in-memory definition loaded at session start, so your repo edits are not tested. **Do not edit anything under `~/.claude/plugins/`** to try to force a reload; that is not a valid testing technique.
+
+The pattern itself (which `skill-creator` automates): spawn a `general-purpose` subagent and inject the agent definition's full text from disk into the subagent's prompt at dispatch time. Each subagent reads the latest content fresh.
 
 ```
 Agent({
