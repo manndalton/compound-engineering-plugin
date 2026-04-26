@@ -21,7 +21,10 @@ Checks (regex-based, no YAML parser dependency):
        truncation — what Codex caught on PR #695)
     3. No top-level scalar value contains `: ` unquoted (mapping confusion)
     4. No top-level scalar value starts unquoted with a YAML reserved
-       indicator (`-`, `` ` ``, `*`, `&`, `!`, `|`, `>`, `%`, `@`, `?`)
+       indicator that takes effect without trailing whitespace (`` ` ``,
+       `*`, `&`, `!`, `|`, `>`, `%`, `@`). Note that `-` and `?` are list /
+       complex-key markers only when followed by whitespace; bare `-foo` and
+       `?foo` are valid plain scalars and are not flagged.
 
 Pure-stdlib (no PyYAML or other third-party deps). Runs in <50ms typical.
 Designed to produce concrete, actionable error messages so the calling
@@ -106,12 +109,11 @@ def main(argv: list[str]) -> int:
                 f"line {lineno}: '{key.strip()}' value contains ': ' — quote it. "
                 "Strict YAML parsers may treat this as a nested mapping."
             )
-        if val_stripped[0] == "-":
-            issues.append(
-                f"line {lineno}: '{key.strip()}' value starts with '-' — quote it. "
-                "Bare '-' reads as a list marker."
-            )
-        if val_stripped[0] in ("`", "*", "&", "!", "|", ">", "%", "@", "?"):
+        # `-` and `?` are list / complex-key markers only when followed by
+        # whitespace — bare `-foo` and `?foo` parse as valid plain scalars,
+        # so we don't flag them. `* & ! | > % @ ` are reserved or take
+        # effect at the first character without needing trailing whitespace.
+        if val_stripped[0] in ("`", "*", "&", "!", "|", ">", "%", "@"):
             issues.append(
                 f"line {lineno}: '{key.strip()}' value starts with reserved "
                 f"indicator '{val_stripped[0]}' — quote it."

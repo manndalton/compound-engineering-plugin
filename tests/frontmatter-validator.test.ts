@@ -109,7 +109,10 @@ Body.
         expect(result.stderr).toMatch(/'title' value contains ': '/)
       })
 
-      test("rejects unquoted scalar starting with '-' (list-marker confusion)", () => {
+      test("accepts unquoted scalar starting with '-' (valid plain scalar; '-' is a list marker only when followed by whitespace)", () => {
+        // YAML 1.2: bare `-foo` is a valid plain scalar. Only `- foo` (with
+        // whitespace after `-`) acts as a list-entry marker. The validator
+        // should not flag `-foo`.
         const docPath = writeTempDoc(`---
 title: -starts-with-dash
 date: 2026-04-25
@@ -122,8 +125,25 @@ severity: low
 Body.
 `)
         const result = runValidator(skillDir, docPath)
-        expect(result.code).toBe(1)
-        expect(result.stderr).toMatch(/'title'.*starts with '-'/)
+        expect(result.code).toBe(0)
+      })
+
+      test("accepts unquoted scalar starting with '?' (valid plain scalar; '?' is a complex-key marker only when followed by whitespace)", () => {
+        // YAML 1.2: bare `?foo` is a valid plain scalar. Only `? foo` (with
+        // whitespace after `?`) acts as a complex-mapping-key marker.
+        const docPath = writeTempDoc(`---
+title: ?question-mark-prefix
+date: 2026-04-25
+module: ce-compound
+problem_type: best_practice
+component: tooling
+severity: low
+---
+
+Body.
+`)
+        const result = runValidator(skillDir, docPath)
+        expect(result.code).toBe(0)
       })
 
       test("rejects unquoted scalar starting with reserved indicator (e.g. '`')", () => {
