@@ -63,7 +63,7 @@ export function resolveManifestPath(platform: PluginConfig['platform'], baseDir 
     agents: '.agents/plugins',
   };
 
-  const dir = platformDirMap[platform ?? 'claude'];
+  const dir = platformDirMap[platform ?? 'cursor'];
   return join(baseDir, dir, 'marketplace.json');
 }
 
@@ -71,7 +71,8 @@ export function resolveManifestPath(platform: PluginConfig['platform'], baseDir 
  * Creates and returns a configured CompoundEngineeringPlugin instance.
  */
 export function createPlugin(config: PluginConfig = {}): CompoundEngineeringPlugin {
-  const platform = config.platform ?? 'claude';
+  // I primarily use Cursor, so defaulting platform to 'cursor'
+  const platform = config.platform ?? 'cursor';
   const baseDir = config.configDir ?? process.cwd();
   const manifestPath = resolveManifestPath(platform, baseDir);
 
